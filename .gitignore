@@ -127,3 +127,6 @@ dist
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Info para mi
+comandos.txt
