@@ -27,16 +27,19 @@ export class PatientsController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.patientsService.findOne(+id);
+    // REMOVE THE '+' SIGN HERE
+    return this.patientsService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
-    return this.patientsService.update(+id, updatePatientDto);
+    // REMOVE THE '+' SIGN HERE
+    return this.patientsService.update(id, updatePatientDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.patientsService.remove(+id);
+    // REMOVE THE '+' SIGN HERE
+    return this.patientsService.remove(id);
   }
 }
