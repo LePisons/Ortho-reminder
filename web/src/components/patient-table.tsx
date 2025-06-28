@@ -8,7 +8,13 @@ import {
   TableRow,
 } from "@/components/ui/table"; // Importing the table parts from Shadcn
 
-export function PatientTable() {
+import { Patient } from "@/app/page";
+
+interface PatientTableProps {
+  patients: Patient[];
+}
+
+export function PatientTable({ patients }: PatientTableProps) {
   return (
     <Table>
       <TableCaption>A list of your recent patients.</TableCaption>
@@ -23,15 +29,20 @@ export function PatientTable() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {/* We will map over our patient data here later */}
-        <TableRow>
-          <TableCell className="font-medium">Test Patient Uno</TableCell>
-          <TableCell>11.111.111-1</TableCell>
-          <TableCell>+56911111111</TableCell>
-          <TableCell>ACTIVE</TableCell>
-          <TableCell>2025-06-27</TableCell>
-          <TableCell className="text-right">15 days</TableCell>
-        </TableRow>
+        {patients.map((patient) => (
+          <TableRow key={patient.id}>
+            <TableCell className="font-medium">{patient.fullName}</TableCell>
+            <TableCell>{patient.rut}</TableCell>
+            <TableCell>{patient.phone}</TableCell>
+            <TableCell>{patient.status}</TableCell>
+            <TableCell>
+              {new Date(patient.treatmentStartDate).toLocaleDateString()}
+            </TableCell>
+            <TableCell className="text-right">
+              {patient.changeFrequency} days
+            </TableCell>
+          </TableRow>
+        ))}
       </TableBody>
     </Table>
   );
