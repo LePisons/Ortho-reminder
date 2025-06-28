@@ -1,5 +1,3 @@
-// In your api/prisma/schema.prisma file
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,28 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Defines the possible statuses for a patient's treatment
+enum PatientStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
 model Patient {
-  id                 String       @id @default(cuid())
-  rut                String       @unique
+  id                 String        @id @default(cuid())
+  rut                String        @unique
   fullName           String
-  phone              String       @unique
-  email              String       @unique
+  phone              String        @unique
+  email              String        @unique
   treatmentStartDate DateTime
   changeFrequency    Int
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  status             PatientStatus @default(ACTIVE) // The new status field
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  // The relationship: One Patient can have MANY MessageLogs.
   messageLogs        MessageLog[]
 }
 
 model MessageLog {
   id             String   @id @default(cuid())
   sentAt         DateTime @default(now())
-  status         String   // e.g., "sent", "delivered", "failed"
+  status         String
   messageContent String
   
-  // The other side of the relationship
   patientId      String
   patient        Patient  @relation(fields: [patientId], references: [id])
 }
