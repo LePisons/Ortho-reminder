@@ -1,6 +1,6 @@
 "use client"; // This must be the very first line
 
-import { useEffect, useState } from "react"; // Import React hooks
+import { useEffect, useState, useCallback } from "react"; // Import React hooks
 import { PatientTable } from "@/components/patient-table";
 import { AddPatientDialog } from "@/components/add-patient-dialog";
 
@@ -20,21 +20,18 @@ export default function HomePage() {
   // Create a state variable to hold our list of patients
   const [patients, setPatients] = useState<Patient[]>([]);
 
-  // useEffect runs when the component mounts (loads)
+  const fetchPatients = useCallback(async () => {
+    try {
+      const response = await fetch("http://localhost:3001/patients");
+      const data = await response.json(); // <--- Corrected line
+      setPatients(data);
+    } catch (error) {
+      console.error("Failed to fetch patients:", error);
+    }
+  }, []);
   useEffect(() => {
-    // Define an async function to fetch the data
-    const fetchPatients = async () => {
-      try {
-        const response = await fetch("http://localhost:3001/patients");
-        const data = await response.json();
-        setPatients(data); // Update our state with the fetched data
-      } catch (error) {
-        console.error("Failed to fetch patients:", error);
-      }
-    };
-
-    fetchPatients(); // Call the function
-  }, []); // The empty array [] means this effect runs only once
+    fetchPatients();
+  }, [fetchPatients]);
 
   return (
     <main className="container mx-auto py-10">
@@ -42,7 +39,8 @@ export default function HomePage() {
         {" "}
         {/* New container for layout */}
         <h1 className="text-3xl font-bold">Patient Dashboard</h1>
-        <AddPatientDialog /> {/* <-- ADD THE COMPONENT HERE */}
+        <AddPatientDialog onPatientAdded={fetchPatients} />{" "}
+        {/* <-- ADD THE COMPONENT HERE */}
       </div>
       <PatientTable patients={patients} />
     </main>

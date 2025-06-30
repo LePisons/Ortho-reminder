@@ -11,7 +11,9 @@ export class PatientsService {
     return this.prisma.patient.create({
       data: {
         ...createPatientDto,
-        treatmentStartDate: new Date(createPatientDto.treatmentStartDate),
+        treatmentStartDate: new Date(
+          createPatientDto.treatmentStartDate + 'T00:00:00',
+        ),
       },
     });
   }

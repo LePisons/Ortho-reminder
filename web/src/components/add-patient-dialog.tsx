@@ -22,8 +22,27 @@ import {
   FormMessage,
 } from "@/components/ui/form"; // Shadcn's Form components
 
-export function AddPatientDialog() {
+import { useState } from "react";
+
+// defines the props interface
+
+interface AddPatientDialogProps {
+  onPatientAdded: () => void;
+}
+
+export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
   // 1. Define your form.
+
+  const getTodayDateString = () => {
+    const today = new Date();
+    // Adjust for the timezone offset before converting to ISO string
+    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    return today.toISOString().split("T")[0];
+  };
+  // Control the dialog is open or not
+
+  const [isOpen, setIsOpen] = useState(false);
+
   const form = useForm({
     // We can add validation rules here later with Zod
     defaultValues: {
@@ -32,23 +51,41 @@ export function AddPatientDialog() {
       email: "",
       phone: "",
       changeFrequency: 10, // Default value
-      treatmentStartDate: new Date().toISOString().split("T")[0], // Defaults to today's date in YYYY-MM-DD format
+      treatmentStartDate: getTodayDateString(), // Defaults to today's date in YYYY-MM-DD format
     },
   });
 
   // 2. Define a submit handler.
-  function onSubmit(values: any) {
-    // We will add the API call here!
-    console.log("Form values to be submitted:", values);
-    alert(JSON.stringify(values, null, 2));
-  }
+  async function onSubmit(values: any) {
+    try {
+      const response = await fetch("http://localhost:3001/patients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
 
+      if (!response.ok) {
+        throw new Error("Something went wrong with the API call");
+      }
+
+      // This is where we will add the "refresh" logic later
+      alert("Patient created successfully!");
+      onPatientAdded();
+      setIsOpen(false);
+      form.reset();
+    } catch (error) {
+      console.error("Failed to create patient:", error);
+      alert("Failed to create patient. Check the console for details.");
+    }
+  }
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button>Add New Patient</Button>
+        <Button onClick={() => setIsOpen(true)}>Add New Patient</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Add New Patient</DialogTitle>
           <DialogDescription>
