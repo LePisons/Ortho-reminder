@@ -36,5 +36,6 @@ model MessageLog {
   messageContent String
   
   patientId      String
-  patient        Patient  @relation(fields: [patientId], references: [id])
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
 }

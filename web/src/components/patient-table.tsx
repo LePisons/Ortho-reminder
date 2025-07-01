@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -26,17 +27,31 @@ import { EditPatientDialog } from "./edit-patient-dialog";
 
 interface PatientTableProps {
   patients: Patient[];
-  onPatientUpdated: () => void;
+  onDataChange: () => void;
 }
 
-export function PatientTable({
-  patients,
-  onPatientUpdated,
-}: PatientTableProps) {
+export function PatientTable({ patients, onDataChange }: PatientTableProps) {
   // Handle delete function
 
   const handleDelete = async (patientId: string) => {
-    alert(`Deleting patient with ID: ${patientId}. API call will go here.`);
+    try {
+      const response = await fetch(
+        `http://localhost:3001/patients/${patientId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete patient");
+      }
+
+      toast.success("Patient deleted successfully!");
+      onDataChange(); // Call the callback to refresh the table
+    } catch (error) {
+      toast.error("Failed to delete patient.");
+      console.error("Delete error:", error);
+    }
   };
   return (
     <Table>
@@ -68,7 +83,7 @@ export function PatientTable({
             <TableCell className="text-right">
               <EditPatientDialog
                 patient={patient}
-                onPatientUpdated={onPatientUpdated}
+                onPatientUpdated={onDataChange}
               >
                 {/* The Button is now a "child" of the dialog */}
                 <Button variant="ghost" size="sm">
