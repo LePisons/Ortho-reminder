@@ -1,5 +1,5 @@
 "use client";
-
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -71,13 +71,15 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
       }
 
       // This is where we will add the "refresh" logic later
-      alert("Patient created successfully!");
+      toast.success("Patient created successfully!");
       onPatientAdded();
       setIsOpen(false);
       form.reset();
     } catch (error) {
+      toast.error("Uh oh! Something went wrong.", {
+        description: "There was a problem with your request.",
+      });
       console.error("Failed to create patient:", error);
-      alert("Failed to create patient. Check the console for details.");
     }
   }
   return (
