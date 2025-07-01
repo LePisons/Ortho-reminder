@@ -18,7 +18,7 @@ export class ReminderService {
 
   // This CRON job will run every day at 9 AM.
 
-  @Cron(CronExpression.EVERY_30_SECONDS, {
+  @Cron(CronExpression.EVERY_DAY_AT_9PM, {
     name: 'aligner_reminders',
     timeZone: 'America/Santiago',
   })
