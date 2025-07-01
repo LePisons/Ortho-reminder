@@ -21,7 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-import { Patient } from "@/app/page";
+import { Patient } from "@/app/( dashboard )/page";
 import { Button } from "@/components/ui/button";
 import { EditPatientDialog } from "./edit-patient-dialog";
 

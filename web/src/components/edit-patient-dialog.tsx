@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 
 import { useForm } from "react-hook-form";
-import type { Patient } from "@/app/page"; // Import our Patient type
+import type { Patient } from "@/app/( dashboard )/page"; // Import our Patient type
 
 // 1. Define the props this component will accept
 interface EditPatientDialogProps {
