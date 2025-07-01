@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -73,7 +74,19 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
             <TableCell className="font-medium">{patient.fullName}</TableCell>
             <TableCell>{patient.rut}</TableCell>
             <TableCell>{patient.phone}</TableCell>
-            <TableCell>{patient.status}</TableCell>
+            <TableCell>
+              <Badge
+                variant={
+                  patient.status === "ACTIVE"
+                    ? "default"
+                    : patient.status === "PAUSED"
+                    ? "secondary"
+                    : "destructive"
+                }
+              >
+                {patient.status}
+              </Badge>
+            </TableCell>
             <TableCell>
               {new Date(patient.treatmentStartDate).toLocaleDateString()}
             </TableCell>

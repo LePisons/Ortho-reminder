@@ -1,5 +1,5 @@
 "use client";
-
+import { toast } from "sonner";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -79,12 +79,12 @@ export function EditPatientDialog({
         throw new Error("Failed to update patient");
       }
 
-      alert("Patient updated successfully!");
+      toast.success("Patient updated successfully!");
       onPatientUpdated(); // Call the callback to refresh the table
       setIsOpen(false); // Close the dialog
     } catch (error) {
       console.error("Failed to update patient:", error);
-      alert("Failed to update patient. Check the console for details.");
+      toast.error("Failed to update patient. Check the console for details.");
     }
   }
 
