@@ -9,12 +9,18 @@ import {
 } from "@/components/ui/table"; // Importing the table parts from Shadcn
 
 import { Patient } from "@/app/page";
+import { Button } from "@/components/ui/button";
+import { EditPatientDialog } from "./edit-patient-dialog";
 
 interface PatientTableProps {
   patients: Patient[];
+  onPatientUpdated: () => void;
 }
 
-export function PatientTable({ patients }: PatientTableProps) {
+export function PatientTable({
+  patients,
+  onPatientUpdated,
+}: PatientTableProps) {
   return (
     <Table>
       <TableCaption>A list of your recent patients.</TableCaption>
@@ -26,6 +32,7 @@ export function PatientTable({ patients }: PatientTableProps) {
           <TableHead>Status</TableHead>
           <TableHead>Start Date</TableHead>
           <TableHead className="text-right">Change Frequency</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -40,6 +47,17 @@ export function PatientTable({ patients }: PatientTableProps) {
             </TableCell>
             <TableCell className="text-right">
               {patient.changeFrequency} days
+            </TableCell>
+            <TableCell className="text-right">
+              <EditPatientDialog
+                patient={patient}
+                onPatientUpdated={onPatientUpdated}
+              >
+                {/* The Button is now a "child" of the dialog */}
+                <Button variant="ghost" size="sm">
+                  Edit
+                </Button>
+              </EditPatientDialog>
             </TableCell>
           </TableRow>
         ))}

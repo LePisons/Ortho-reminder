@@ -42,7 +42,7 @@ export default function HomePage() {
         <AddPatientDialog onPatientAdded={fetchPatients} />{" "}
         {/* <-- ADD THE COMPONENT HERE */}
       </div>
-      <PatientTable patients={patients} />
+      <PatientTable patients={patients} onPatientUpdated={fetchPatients} />
     </main>
   );
 }
