@@ -99,4 +99,72 @@ export class PatientsService {
       where: { id },
     });
   }
+
+  async getStats() {
+    const total = await this.prisma.patient.count();
+    const active = await this.prisma.patient.count({
+      where: { status: 'ACTIVE' },
+    });
+    const paused = await this.prisma.patient.count({
+      where: { status: 'PAUSED' },
+    });
+    const finished = await this.prisma.patient.count({
+      where: { status: 'FINISHED' },
+    });
+
+    return { total, active, paused, finished };
+  }
+
+  async findUpcomingChanges(page: number = 1, limit: number = 5) {
+    const activePatients = await this.prisma.patient.findMany({
+      where: { status: 'ACTIVE' },
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const patientsWithNextChange = activePatients.map((patient) => {
+      const startDate = new Date(patient.treatmentStartDate);
+      const timeDiff = today.getTime() - startDate.getTime();
+      const daysSinceStart = Math.floor(timeDiff / (1000 * 3600 * 24));
+
+      const remainder =
+        daysSinceStart >= 0 ? daysSinceStart % patient.changeFrequency : 0;
+      const daysUntilNextChange = patient.changeFrequency - remainder;
+
+      const nextChangeDate = new Date(today);
+      nextChangeDate.setDate(today.getDate() + daysUntilNextChange);
+
+      const currentAligner =
+        daysSinceStart >= 0
+          ? Math.floor(daysSinceStart / patient.changeFrequency) + 1
+          : 1;
+
+      return {
+        id: patient.id,
+        fullName: patient.fullName,
+        daysUntilNextChange,
+        nextChangeDate,
+        currentAligner,
+      };
+    });
+
+    // Sort patients by who is closest to their next change
+    const sortedPatients = patientsWithNextChange.sort(
+      (a, b) => a.daysUntilNextChange - b.daysUntilNextChange,
+    );
+
+    // Manually apply pagination to the sorted array
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+    const paginatedData = sortedPatients.slice(startIndex, endIndex);
+
+    return {
+      data: paginatedData,
+      total: sortedPatients.length,
+      page,
+      limit,
+      totalPages: Math.ceil(sortedPatients.length / limit),
+    };
+  }
 }

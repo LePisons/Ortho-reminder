@@ -19,6 +19,11 @@ import { UpdatePatientDto } from './dto/update-patient.dto';
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
+  @Get('stats') // This creates the GET /patients/stats route
+  getStats() {
+    return this.patientsService.getStats();
+  }
+
   @Post()
   create(@Body() createPatientDto: CreatePatientDto) {
     return this.patientsService.create(createPatientDto);
@@ -30,6 +35,14 @@ export class PatientsController {
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
     return this.patientsService.findAll(page, limit);
+  }
+
+  @Get('upcoming')
+  findUpcomingChanges(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number,
+  ) {
+    return this.patientsService.findUpcomingChanges(page, limit);
   }
 
   @Get(':id')

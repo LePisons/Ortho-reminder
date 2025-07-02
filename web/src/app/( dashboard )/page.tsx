@@ -23,6 +23,10 @@ export default function HomePage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [stats, setStats] = useState({ active: 0, paused: 0, finished: 0 });
+  const [upcoming, setUpcoming] = useState([]);
+  const [upcomingPage, setUpcomingPage] = useState(1);
+  const [upcomingTotalPages, setUpcomingTotalPages] = useState(1);
 
   const fetchPatients = useCallback(async (page: number) => {
     try {
@@ -37,55 +41,63 @@ export default function HomePage() {
       console.error("Failed to fetch patients:", error);
     }
   }, []);
-  useEffect(() => {
-    fetchPatients(currentPage);
-  }, [currentPage, fetchPatients]);
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch("http://localhost:3001/patients/stats");
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error("Failed to fetch stats:", error);
+    }
+  }, []);
 
+  const fetchUpcoming = useCallback(async (page: number) => {
+    try {
+      // Call the new /patients/upcoming endpoint
+      const response = await fetch(
+        `http://localhost:3001/patients/upcoming?page=${page}&limit=5`
+      );
+      const result = await response.json();
+
+      setUpcoming(result.data);
+      setUpcomingTotalPages(result.totalPages);
+      setUpcomingPage(result.page);
+    } catch (error) {
+      console.error("Failed to fetch upcoming changes:", error);
+    }
+  }, []);
+
+  // This useEffect for fetching patients remains separate
+  useEffect(() => {
+    fetchStats();
+    fetchPatients(1);
+    fetchUpcoming(1); // Always fetch the first page on initial load
+  }, [fetchStats, fetchPatients, fetchUpcoming]); // This runs once because the functions don't
+
+  useEffect(() => {
+    if (currentPage > 1) {
+      fetchPatients(currentPage);
+    }
+  }, [currentPage, fetchPatients]);
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
   };
 
   const handleDataChange = () => {
-    // When data changes (add, edit, delete), always go back to page 1
-    // and re-fetch the data.
+    fetchStats();
+    fetchUpcoming(1); // <-- ADD THIS LINE TO REFRESH STATS
+
     if (currentPage === 1) {
       fetchPatients(1);
     } else {
       setCurrentPage(1);
     }
   };
-
+  const handleUpcomingPageChange = (newPage: number) => {
+    // We don't need to set state here because fetchUpcoming does it
+    fetchUpcoming(newPage);
+  };
   // Calcula fecha y número de los próximos alineadores
-
-  const upcomingChanges = patients
-    .filter((p) => p.status === "ACTIVE") // Only consider active patients
-    .map((patient) => {
-      const startDate = new Date(patient.treatmentStartDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Normalize today's date to the start of the day
-
-      const timeDiff = today.getTime() - startDate.getTime();
-      const daysSinceStart = Math.floor(timeDiff / (1000 * 3600 * 24));
-
-      const remainder = daysSinceStart % patient.changeFrequency;
-      const daysUntilNextChange = patient.changeFrequency - remainder;
-
-      const nextChangeDate = new Date(today);
-      nextChangeDate.setDate(today.getDate() + daysUntilNextChange);
-
-      const currentAligner =
-        Math.floor(daysSinceStart / patient.changeFrequency) + 1;
-
-      return {
-        ...patient,
-        nextChangeDate,
-        daysUntilNextChange,
-        currentAligner,
-      };
-    })
-    .sort((a, b) => a.daysUntilNextChange - b.daysUntilNextChange) // Sort by closest change
-    .slice(0, 5); // Only show the top 5
-
   const activePatients = patients.filter((p) => p.status === "ACTIVE").length;
 
   return (
@@ -98,15 +110,9 @@ export default function HomePage() {
 
       {/* Stat Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard title="Active Patients" value={activePatients} />
-        <StatCard
-          title="Paused Patients"
-          value={patients.filter((p) => p.status === "PAUSED").length}
-        />
-        <StatCard
-          title="Finished Patients"
-          value={patients.filter((p) => p.status === "FINISHED").length}
-        />
+        <StatCard title="Active Patients" value={stats.active} />
+        <StatCard title="Paused Patients" value={stats.paused} />
+        <StatCard title="Finished Patients" value={stats.finished} />
       </div>
 
       {/* Main Two-Column Layout */}
@@ -130,7 +136,12 @@ export default function HomePage() {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h2 className="text-lg font-semibold mb-4">Upcoming Changes</h2>
 
-            <UpcomingChangesList patients={upcomingChanges} />
+            <UpcomingChangesList
+              patients={upcoming}
+              currentPage={upcomingPage}
+              totalPages={upcomingTotalPages}
+              onPageChange={handleUpcomingPageChange}
+            />
           </div>
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h2 className="text-lg font-semibold mb-4">Activity Feed</h2>
