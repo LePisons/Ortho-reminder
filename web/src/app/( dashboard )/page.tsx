@@ -5,7 +5,7 @@ import { PatientTable } from "@/components/patient-table";
 import { AddPatientDialog } from "@/components/add-patient-dialog";
 import { StatCard } from "@/components/stat-card";
 import { UpcomingChangesList } from "@/components/upcoming-changes-list";
-
+import { PaginationControls } from "@/components/pagination-controls";
 // We define a Type for our patient data to make our code safer
 export type Patient = {
   id: string;
@@ -21,19 +21,39 @@ export type Patient = {
 export default function HomePage() {
   // Create a state variable to hold our list of patients
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const fetchPatients = useCallback(async () => {
+  const fetchPatients = useCallback(async (page: number) => {
     try {
-      const response = await fetch("http://localhost:3001/patients");
-      const data = await response.json(); // <--- Corrected line
-      setPatients(data);
+      const response = await fetch(
+        `http://localhost:3001/patients?page=${page}&limit=10`
+      );
+      const result = await response.json(); // <--- Corrected line
+      setPatients(result.data);
+      setTotalPages(result.totalPages);
+      setCurrentPage(result.page);
     } catch (error) {
       console.error("Failed to fetch patients:", error);
     }
   }, []);
   useEffect(() => {
-    fetchPatients();
-  }, [fetchPatients]);
+    fetchPatients(currentPage);
+  }, [currentPage, fetchPatients]);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleDataChange = () => {
+    // When data changes (add, edit, delete), always go back to page 1
+    // and re-fetch the data.
+    if (currentPage === 1) {
+      fetchPatients(1);
+    } else {
+      setCurrentPage(1);
+    }
+  };
 
   // Calcula fecha y número de los próximos alineadores
 
@@ -95,9 +115,14 @@ export default function HomePage() {
         <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Patient List</h2>
-            <AddPatientDialog onPatientAdded={fetchPatients} />
+            <AddPatientDialog onPatientAdded={handleDataChange} />
           </div>
-          <PatientTable patients={patients} onDataChange={fetchPatients} />
+          <PatientTable patients={patients} onDataChange={handleDataChange} />
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
         </div>
 
         {/* Right Column (takes up 1/3 of the space) */}

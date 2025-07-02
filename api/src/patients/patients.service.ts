@@ -45,8 +45,27 @@ export class PatientsService {
     return newPatient;
   }
 
-  findAll() {
-    return this.prisma.patient.findMany();
+  // The method now needs to accept page and limit, with defaults
+  async findAll(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit; // Calculate how many records to skip
+
+    // We now run two queries: one for the data, one for the total count
+    const [patients, total] = await this.prisma.$transaction([
+      this.prisma.patient.findMany({
+        skip: skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }, // Always good to have a consistent order
+      }),
+      this.prisma.patient.count(),
+    ]);
+
+    return {
+      data: patients,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   findOne(id: string) {
