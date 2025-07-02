@@ -4,9 +4,10 @@ import { PrismaService } from './prisma/prisma.service'; // This import is corre
 import { ReminderService } from './reminder/reminder.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TwilioService } from './twilio/twilio.service';
+import { MessageLogModule } from './message-log/message-log.module';
 
 @Module({
-  imports: [PatientsModule, ScheduleModule.forRoot()],
+  imports: [PatientsModule, ScheduleModule.forRoot(), MessageLogModule],
   controllers: [],
   providers: [PrismaService, ReminderService, TwilioService],
 })
