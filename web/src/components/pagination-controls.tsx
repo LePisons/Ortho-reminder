@@ -13,17 +13,23 @@ export function PaginationControls({
   onPageChange,
 }: PaginationProps) {
   return (
-    <div className="flex items-center justify-end gap-4 mt-4">
+    <div className="flex items-center justify-end gap-2">
+      {" "}
+      {/* Reduce gap for a tighter look */}
       <Button
+        size="sm" // <-- ADD THIS
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage <= 1}
       >
         Previous
       </Button>
-      <span>
+      <span className="text-sm text-gray-600">
+        {" "}
+        {/* Make text smaller and lighter */}
         Page {currentPage} of {totalPages}
       </span>
       <Button
+        size="sm" // <-- ADD THIS
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage >= totalPages}
       >

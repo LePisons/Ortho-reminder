@@ -1,6 +1,6 @@
 "use client"; // This must be the very first line
 
-import { useEffect, useState, useCallback } from "react"; // Import React hooks
+import { useEffect, useState, useCallback, useRef } from "react"; // Import React hooks
 import { PatientTable } from "@/components/patient-table";
 import { AddPatientDialog } from "@/components/add-patient-dialog";
 import { StatCard } from "@/components/stat-card";
@@ -27,6 +27,8 @@ export default function HomePage() {
   const [upcoming, setUpcoming] = useState([]);
   const [upcomingPage, setUpcomingPage] = useState(1);
   const [upcomingTotalPages, setUpcomingTotalPages] = useState(1);
+
+  const isInitialMount = useRef(true);
 
   const fetchPatients = useCallback(async (page: number) => {
     try {
@@ -75,9 +77,14 @@ export default function HomePage() {
   }, [fetchStats, fetchPatients, fetchUpcoming]); // This runs once because the functions don't
 
   useEffect(() => {
-    if (currentPage > 1) {
-      fetchPatients(currentPage);
+    // If it's the first render, do nothing, because the other useEffect handled it.
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
     }
+
+    // On all subsequent renders where currentPage changes, fetch the new page.
+    fetchPatients(currentPage);
   }, [currentPage, fetchPatients]);
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);

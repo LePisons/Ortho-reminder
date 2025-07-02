@@ -85,7 +85,9 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button onClick={() => setIsOpen(true)}>Add New Patient</Button>
+        <Button size="sm" onClick={() => setIsOpen(true)}>
+          Add New Patient
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

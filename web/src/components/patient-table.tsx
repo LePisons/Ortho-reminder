@@ -56,7 +56,7 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
   };
   return (
     <Table>
-      <TableCaption>A list of your recent patients.</TableCaption>
+      <TableCaption>Lista de los últimos pacientes</TableCaption>
       <TableHeader>
         <TableRow>
           <TableHead>Full Name</TableHead>

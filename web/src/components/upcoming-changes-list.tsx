@@ -54,11 +54,15 @@ export function UpcomingChangesList({
         ))}
       </ul>
       {totalPages > 1 && (
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={onPageChange}
-        />
+        <div className="flex justify-center mt-4">
+          {" "}
+          {/* Centering wrapper */}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
+        </div>
       )}
     </>
   );
