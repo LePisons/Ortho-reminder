@@ -5,9 +5,10 @@ import { ReminderService } from './reminder/reminder.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TwilioService } from './twilio/twilio.service';
 import { MessageLogModule } from './message-log/message-log.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
-  imports: [PatientsModule, ScheduleModule.forRoot(), MessageLogModule],
+  imports: [PatientsModule, ScheduleModule.forRoot(), MessageLogModule, AuthModule],
   controllers: [],
   providers: [PrismaService, ReminderService, TwilioService],
 })

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,56 +7,47 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PatientsService {
-  // Inject both PrismaService and TwilioService so we can use them
   constructor(
     private prisma: PrismaService,
     private twilioService: TwilioService,
   ) {}
 
-  // This method now needs to be async to handle the message sending
-  async create(createPatientDto: CreatePatientDto) {
-    // Step 1: Create the patient in the database first
+  async create(createPatientDto: CreatePatientDto, userId: string) {
     const newPatient = await this.prisma.patient.create({
       data: {
         ...createPatientDto,
-        // This forces the date to be interpreted as UTC midnight to prevent timezone bugs
         treatmentStartDate: new Date(
           createPatientDto.treatmentStartDate + 'T00:00:00',
         ),
+        userId: userId,
       },
     });
 
-    // Step 2: After the patient is successfully created, try to send a welcome message
     try {
       const welcomeMessage = `¡Hola ${newPatient.fullName}! Bienvenido/a a tu tratamiento de ortodoncia. Recibirás recordatorios para cambiar tus alineadores. ¡Mucho éxito!`;
-
-      // Use our reusable TwilioService to send the message
       await this.twilioService.sendWhatsApp(newPatient.phone, welcomeMessage);
     } catch (error) {
-      // If sending the message fails, we don't want the whole operation to crash.
-      // We log the error to the backend console for debugging, but the user still gets a success response.
       console.error(
         `Patient ${newPatient.fullName} was created, but the welcome message failed to send.`,
         error,
       );
     }
 
-    // Step 3: Return the data for the newly created patient
     return newPatient;
   }
 
-  // The method now needs to accept page and limit, with defaults
-  async findAll(page: number = 1, limit: number = 10) {
-    const skip = (page - 1) * limit; // Calculate how many records to skip
+  async findAll(userId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    const where = { userId };
 
-    // We now run two queries: one for the data, one for the total count
     const [patients, total] = await this.prisma.$transaction([
       this.prisma.patient.findMany({
-        skip: skip,
+        where,
+        skip,
         take: limit,
-        orderBy: { createdAt: 'desc' }, // Always good to have a consistent order
+        orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.patient.count(),
+      this.prisma.patient.count({ where }),
     ]);
 
     return {
@@ -68,20 +59,24 @@ export class PatientsService {
     };
   }
 
-  findOne(id: string) {
-    return this.prisma.patient.findUnique({
-      where: { id: id },
+  async findOne(id: string, userId: string) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id, userId },
     });
+    if (!patient) {
+      throw new NotFoundException(`Patient with ID "${id}" not found`);
+    }
+    return patient;
   }
 
-  // Note: The update method could also be modified to handle dates correctly if needed
-  async update(id: string, updatePatientDto: UpdatePatientDto) {
-    // 2. Create a correctly typed data object
+  async update(id: string, updatePatientDto: UpdatePatientDto, userId: string) {
+    // First, ensure the patient belongs to the user
+    await this.findOne(id, userId);
+
     const dataToUpdate: Prisma.PatientUpdateInput = {
       ...updatePatientDto,
     };
 
-    // 3. The 'if' check remains the same
     if (updatePatientDto.treatmentStartDate) {
       dataToUpdate.treatmentStartDate = new Date(
         updatePatientDto.treatmentStartDate + 'T00:00:00',
@@ -90,34 +85,40 @@ export class PatientsService {
 
     return this.prisma.patient.update({
       where: { id },
-      data: dataToUpdate, // 4. Now this assignment is safe!
+      data: dataToUpdate,
     });
   }
 
-  remove(id: string) {
+  async remove(id: string, userId: string) {
+    await this.findOne(id, userId);
     return this.prisma.patient.delete({
       where: { id },
     });
   }
 
-  async getStats() {
-    const total = await this.prisma.patient.count();
+  async getStats(userId: string) {
+    const where = { userId };
+    const total = await this.prisma.patient.count({ where });
     const active = await this.prisma.patient.count({
-      where: { status: 'ACTIVE' },
+      where: { ...where, status: 'ACTIVE' },
     });
     const paused = await this.prisma.patient.count({
-      where: { status: 'PAUSED' },
+      where: { ...where, status: 'PAUSED' },
     });
     const finished = await this.prisma.patient.count({
-      where: { status: 'FINISHED' },
+      where: { ...where, status: 'FINISHED' },
     });
 
     return { total, active, paused, finished };
   }
 
-  async findUpcomingChanges(page: number = 1, limit: number = 5) {
+  async findUpcomingChanges(
+    userId: string,
+    page: number = 1,
+    limit: number = 5,
+  ) {
     const activePatients = await this.prisma.patient.findMany({
-      where: { status: 'ACTIVE' },
+      where: { userId, status: 'ACTIVE' },
     });
 
     const today = new Date();
@@ -149,12 +150,10 @@ export class PatientsService {
       };
     });
 
-    // Sort patients by who is closest to their next change
     const sortedPatients = patientsWithNextChange.sort(
       (a, b) => a.daysUntilNextChange - b.daysUntilNextChange,
     );
 
-    // Manually apply pagination to the sorted array
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
     const paginatedData = sortedPatients.slice(startIndex, endIndex);

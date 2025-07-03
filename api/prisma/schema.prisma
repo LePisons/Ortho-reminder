@@ -14,6 +14,18 @@ enum PatientStatus {
   FINISHED
 }
 
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  password  String    // This will store the HASHED password
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // The relationship: One User has many Patients
+  patients  Patient[]
+}
+
 model Patient {
   id                 String        @id @default(cuid())
   rut                String        @unique
@@ -25,6 +37,8 @@ model Patient {
   status             PatientStatus @default(ACTIVE) // The new status field
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  userId             String   // The foreign key
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   messageLogs        MessageLog[]
 }
