@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Represents the Orthodontist who logs in and uses the application.
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  fullName  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patients Patient[]
+}
+
 enum PatientStatus {
   ACTIVE
   PAUSED
@@ -15,10 +27,10 @@ enum PatientStatus {
 
 model Patient {
   id                 String        @id @default(cuid())
-  rut                String        @unique
+  rut                String
   fullName           String
-  phone              String        @unique
-  email              String        @unique
+  phone              String
+  email              String
   treatmentStartDate DateTime
   changeFrequency    Int
   status             PatientStatus @default(ACTIVE)
@@ -26,6 +38,15 @@ model Patient {
   updatedAt          DateTime      @updatedAt
 
   messageLogs        MessageLog[]
+
+  // --- RELATIONSHIP TO USER (ORTHODONTIST) ---
+  userId             String
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- MULTI-TENANT UNIQUE CONSTRAINTS ---
+  @@unique([userId, rut])
+  @@unique([userId, phone])
+  @@unique([userId, email])
 }
 
 model MessageLog {
@@ -33,7 +54,7 @@ model MessageLog {
   sentAt         DateTime @default(now())
   status         String
   messageContent String
-  
+
   patientId      String
   patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
