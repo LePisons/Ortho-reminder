@@ -1,3 +1,6 @@
+
+import Link from "next/link";
+import { API_URL } from "@/lib/utils";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,7 +40,7 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
   const handleDelete = async (patientId: string) => {
     try {
       const response = await fetch(
-        `http://localhost:3001/patients/${patientId}`,
+        `${API_URL}/patients/${patientId}`,
         {
           method: "DELETE",
         }
@@ -71,7 +74,11 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
       <TableBody>
         {patients.map((patient) => (
           <TableRow key={patient.id}>
-            <TableCell className="font-medium">{patient.fullName}</TableCell>
+            <TableCell className="font-medium">
+              <Link href={`/patients/${patient.id}`} className="hover:underline text-blue-600">
+                {patient.fullName}
+              </Link>
+            </TableCell>
             <TableCell>{patient.rut}</TableCell>
             <TableCell>{patient.phone}</TableCell>
             <TableCell>
@@ -116,7 +123,7 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                       This action cannot be undone. This will permanently delete
-                      the patient "{patient.fullName}" and all of their
+                      the patient &quot;{patient.fullName}&quot; and all of their
                       associated data.
                     </AlertDialogDescription>
                   </AlertDialogHeader>

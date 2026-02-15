@@ -14,11 +14,12 @@ export class PatientsService {
   ) {}
 
   // This method now needs to be async to handle the message sending
-  async create(createPatientDto: CreatePatientDto) {
+  async create(createPatientDto: CreatePatientDto, userId: string) {
     // Step 1: Create the patient in the database first
     const newPatient = await this.prisma.patient.create({
       data: {
         ...createPatientDto,
+        userId: userId,
         // This forces the date to be interpreted as UTC midnight to prevent timezone bugs
         treatmentStartDate: new Date(
           createPatientDto.treatmentStartDate + 'T00:00:00',
@@ -71,6 +72,10 @@ export class PatientsService {
   findOne(id: string) {
     return this.prisma.patient.findUnique({
       where: { id: id },
+      include: {
+        clinicalRecords: true,
+        patientImages: true,
+      },
     });
   }
 

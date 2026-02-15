@@ -1,5 +1,6 @@
 "use client";
 import { toast } from "sonner";
+import { API_URL } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
 import { useForm } from "react-hook-form"; // For form state management
 import {
   Form,
@@ -56,14 +57,15 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
   });
 
   // 2. Define a submit handler.
-  async function onSubmit(values: any) {
+  async function onSubmit(values: Record<string, unknown>) {
     try {
-      const response = await fetch("http://localhost:3001/patients", {
+      const response = await fetch(`${API_URL}/patients`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(values),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -93,7 +95,7 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
         <DialogHeader>
           <DialogTitle>Add New Patient</DialogTitle>
           <DialogDescription>
-            Enter the new patient's details here. Click save when you're done.
+            Enter the new patient&apos;s details here. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
 

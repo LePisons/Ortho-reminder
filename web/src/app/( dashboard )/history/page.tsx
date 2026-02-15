@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+import { API_URL } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -29,7 +31,7 @@ export default function HistoryPage() {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const response = await fetch("http://localhost:3001/message-log");
+        const response = await fetch(`${API_URL}/message-log`);
         const data = await response.json();
         setLogs(data);
       } catch (error) {

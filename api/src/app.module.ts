@@ -1,14 +1,28 @@
 import { Module } from '@nestjs/common';
 import { PatientsModule } from './patients/patients.module';
-import { PrismaService } from './prisma/prisma.service'; // This import is correct, the issue is likely elsewhere if it's a "cannot find module" error.
+import { PrismaModule } from './prisma/prisma.module';
 import { ReminderService } from './reminder/reminder.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TwilioService } from './twilio/twilio.service';
 import { MessageLogModule } from './message-log/message-log.module';
+import { AuthService } from './auth/auth.service';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { ClinicalRecordsModule } from './clinical-records/clinical-records.module';
+import { PatientImagesModule } from './patient-images/patient-images.module';
 
 @Module({
-  imports: [PatientsModule, ScheduleModule.forRoot(), MessageLogModule],
+  imports: [
+    PatientsModule,
+    ScheduleModule.forRoot(),
+    MessageLogModule,
+    UsersModule,
+    PrismaModule,
+    AuthModule,
+    ClinicalRecordsModule,
+    PatientImagesModule,
+  ],
   controllers: [],
-  providers: [PrismaService, ReminderService, TwilioService],
+  providers: [ReminderService, TwilioService],
 })
 export class AppModule {}

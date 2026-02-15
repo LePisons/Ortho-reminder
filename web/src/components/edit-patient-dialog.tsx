@@ -1,5 +1,6 @@
 "use client";
 import { toast } from "sonner";
+import { API_URL } from "@/lib/utils";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -62,10 +63,10 @@ export function EditPatientDialog({
   });
 
   // 3. Define a placeholder submit handler
-  async function onSubmit(values: any) {
+  async function onSubmit(values: Record<string, unknown>) {
     try {
       const response = await fetch(
-        `http://localhost:3001/patients/${patient.id}`,
+        `${API_URL}/patients/${patient.id}`,
         {
           method: "PATCH", // Use the PATCH method for updates
           headers: {

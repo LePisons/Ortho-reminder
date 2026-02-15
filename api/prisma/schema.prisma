@@ -22,10 +22,42 @@ model Patient {
   treatmentStartDate DateTime
   changeFrequency    Int
   status             PatientStatus @default(ACTIVE)
+  avatarUrl          String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
+  userId             String
+  user               User          @relation(fields: [userId], references: [id])
   messageLogs        MessageLog[]
+  clinicalRecords    ClinicalRecord[]
+  patientImages      PatientImage[]
+}
+
+model ClinicalRecord {
+  id             String   @id @default(cuid())
+  date           DateTime @default(now())
+  diagnosis      String?
+  treatmentPlan  String?
+  observations   String?
+  
+  patientId      String
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+enum ImageType {
+  PHOTO
+  XRAY
+}
+
+model PatientImage {
+  id          String    @id @default(cuid())
+  url         String
+  type        ImageType
+  date        DateTime  @default(now())
+  description String?
+
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model MessageLog {
@@ -36,4 +68,15 @@ model MessageLog {
   
   patientId      String
   patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  patients  Patient[]
+
 }

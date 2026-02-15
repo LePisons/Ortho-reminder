@@ -6,6 +6,7 @@ import { AddPatientDialog } from "@/components/add-patient-dialog";
 import { StatCard } from "@/components/stat-card";
 import { UpcomingChangesList } from "@/components/upcoming-changes-list";
 import { PaginationControls } from "@/components/pagination-controls";
+import { API_URL } from "@/lib/utils";
 // We define a Type for our patient data to make our code safer
 export type Patient = {
   id: string;
@@ -33,7 +34,7 @@ export default function HomePage() {
   const fetchPatients = useCallback(async (page: number) => {
     try {
       const response = await fetch(
-        `http://localhost:3001/patients?page=${page}&limit=10`
+        `${API_URL}/patients?page=${page}&limit=10`
       );
       const result = await response.json(); // <--- Corrected line
       setPatients(result.data);
@@ -45,7 +46,7 @@ export default function HomePage() {
   }, []);
   const fetchStats = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:3001/patients/stats");
+      const response = await fetch(`${API_URL}/patients/stats`);
       const data = await response.json();
       setStats(data);
     } catch (error) {
@@ -57,7 +58,7 @@ export default function HomePage() {
     try {
       // Call the new /patients/upcoming endpoint
       const response = await fetch(
-        `http://localhost:3001/patients/upcoming?page=${page}&limit=5`
+        `${API_URL}/patients/upcoming?page=${page}&limit=5`
       );
       const result = await response.json();
 
@@ -104,9 +105,6 @@ export default function HomePage() {
     // We don't need to set state here because fetchUpcoming does it
     fetchUpcoming(newPage);
   };
-  // Calcula fecha y número de los próximos alineadores
-  const activePatients = patients.filter((p) => p.status === "ACTIVE").length;
-
   return (
     <div>
       {/* Main Page Header */}

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_URL } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +35,9 @@ export function PatientRegistrationForm() {
     },
   });
 
-  async function onSubmit(values: any) {
+  async function onSubmit(values: Record<string, unknown>) {
     try {
-      const response = await fetch("http://localhost:3001/patients", {
+      const response = await fetch(`${API_URL}/patients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
