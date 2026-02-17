@@ -54,7 +54,7 @@ export function PatientInfoCard({ patient, onUpdate }: PatientInfoCardProps) {
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
           <div className="relative group">
             <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-              <AvatarImage src={patient.avatarUrl} alt={patient.fullName} />
+              <AvatarImage src={patient.avatarUrl || undefined} alt={patient.fullName} />
               <AvatarFallback className="text-4xl">
                 {patient.fullName
                   .split(" ")

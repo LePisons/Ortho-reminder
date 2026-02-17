@@ -5,5 +5,6 @@ export class CreatePatientImageDto {
   type: ImageType;
   date?: string; // Optional, default to now
   description?: string;
+  category?: string;
   patientId: string;
 }

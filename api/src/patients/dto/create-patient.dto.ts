@@ -6,4 +6,7 @@ export class CreatePatientDto {
   treatmentStartDate: string; // Use string for now, we'll convert it
   changeFrequency: number;
   avatarUrl?: string;
+  diagnosis?: string;
+  treatmentPlan?: string;
+  observations?: string;
 }

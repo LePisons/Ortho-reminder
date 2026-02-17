@@ -8,6 +8,9 @@ export interface Patient {
   changeFrequency: number;
   status: 'ACTIVE' | 'PAUSED' | 'FINISHED';
   avatarUrl?: string; // Optional field for profile picture
+  diagnosis?: string;
+  treatmentPlan?: string;
+  observations?: string;
   createdAt: string;
   updatedAt: string;
   clinicalRecords?: ClinicalRecord[];
@@ -29,5 +32,6 @@ export interface PatientImage {
   type: 'PHOTO' | 'XRAY';
   date: string;
   description?: string;
+  category?: string;
   patientId: string;
 }

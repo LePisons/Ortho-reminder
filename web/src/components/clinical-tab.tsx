@@ -2,7 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ClinicalRecord } from "@/lib/types";
@@ -20,27 +28,23 @@ interface ClinicalTabProps {
 
 export function ClinicalTab({ patientId, records, onUpdate }: ClinicalTabProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    diagnosis: "",
-    treatmentPlan: "",
-    observations: "",
-  });
+  const [observations, setObservations] = useState("");
 
   const handleSubmit = async () => {
     try {
       const response = await fetch(`${API_URL}/clinical-records`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, patientId }),
+        body: JSON.stringify({ observations, patientId }),
         credentials: "include",
       });
 
       if (!response.ok) throw new Error("Failed to add clinical record");
 
-      toast.success("Clinical record added successfully");
+      toast.success("Follow-up note added successfully");
       onUpdate();
       setIsOpen(false);
-      setFormData({ diagnosis: "", treatmentPlan: "", observations: "" });
+      setObservations("");
     } catch (error) {
       toast.error("Failed to add clinical record");
       console.error(error);
@@ -50,57 +54,34 @@ export function ClinicalTab({ patientId, records, onUpdate }: ClinicalTabProps) 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Clinical History</h2>
+        <h2 className="text-2xl font-bold">Follow-up Notes</h2>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
             <Button>
-              <Plus className="mr-2 h-4 w-4" /> Add Record
+              <Plus className="mr-2 h-4 w-4" /> Add Note
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add Clinical Record</DialogTitle>
+              <DialogTitle>Add Follow-up Note</DialogTitle>
               <DialogDescription>
-                Add a new diagnosis, treatment plan, or observation.
+                Record observations or updates for this visit.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="diagnosis">Diagnosis</Label>
-                <Textarea
-                  id="diagnosis"
-                  value={formData.diagnosis}
-                  onChange={(e) =>
-                    setFormData({ ...formData, diagnosis: e.target.value })
-                  }
-                  placeholder="Enter diagnosis..."
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="treatmentPlan">Treatment Plan</Label>
-                <Textarea
-                  id="treatmentPlan"
-                  value={formData.treatmentPlan}
-                  onChange={(e) =>
-                    setFormData({ ...formData, treatmentPlan: e.target.value })
-                  }
-                  placeholder="Enter treatment plan..."
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="observations">Observations</Label>
+                <Label htmlFor="observations">Note</Label>
                 <Textarea
                   id="observations"
-                  value={formData.observations}
-                  onChange={(e) =>
-                    setFormData({ ...formData, observations: e.target.value })
-                  }
-                  placeholder="Any additional observations..."
+                  value={observations}
+                  onChange={(e) => setObservations(e.target.value)}
+                  placeholder="Enter follow-up notes..."
+                  rows={5}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleSubmit}>Save Record</Button>
+              <Button onClick={handleSubmit}>Save Note</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -109,7 +90,7 @@ export function ClinicalTab({ patientId, records, onUpdate }: ClinicalTabProps) 
       <div className="space-y-4">
         {records.length === 0 ? (
           <p className="text-muted-foreground text-center py-8">
-            No clinical records found.
+            No follow-up notes found.
           </p>
         ) : (
           records.map((record) => (
@@ -120,26 +101,23 @@ export function ClinicalTab({ patientId, records, onUpdate }: ClinicalTabProps) 
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  {record.diagnosis && (
-                    <div>
-                      <h4 className="font-semibold mb-1">Diagnosis</h4>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{record.diagnosis}</p>
-                    </div>
-                  )}
-                  {record.treatmentPlan && (
-                    <div>
-                      <h4 className="font-semibold mb-1">Treatment Plan</h4>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{record.treatmentPlan}</p>
-                    </div>
-                  )}
-                  {record.observations && (
-                    <div>
-                      <h4 className="font-semibold mb-1">Observations</h4>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{record.observations}</p>
-                    </div>
-                  )}
-                </div>
+                {record.observations && (
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {record.observations}
+                  </p>
+                )}
+                {record.diagnosis && (
+                  <div className="mt-2">
+                    <h4 className="font-semibold text-xs text-muted-foreground mb-1">Diagnosis</h4>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{record.diagnosis}</p>
+                  </div>
+                )}
+                {record.treatmentPlan && (
+                  <div className="mt-2">
+                    <h4 className="font-semibold text-xs text-muted-foreground mb-1">Treatment Plan</h4>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{record.treatmentPlan}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))

@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { API_URL } from "@/lib/utils";
 import { Patient } from "@/lib/types";
 import { PatientInfoCard } from "@/components/patient-info-card";
+import { PatientSummaryCard } from "@/components/patient-summary-card";
 import { ClinicalTab } from "@/components/clinical-tab";
 import { ImagesTab } from "@/components/images-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 export default function PatientDetailsPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +52,20 @@ export default function PatientDetailsPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Back to Dashboard */}
+      <Button
+        variant="ghost"
+        onClick={() => router.push("/")}
+        className="gap-2 text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Dashboard
+      </Button>
+
       <PatientInfoCard patient={patient} onUpdate={fetchPatient} />
+
+      {/* Clinical Summary — editable, always visible at the top */}
+      <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
 
       <Tabs defaultValue="clinical" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
