@@ -3,13 +3,9 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Patient } from "@/lib/types";
 import { Calendar, Mail, Phone, User, Edit } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { API_URL } from "@/lib/utils";
 
@@ -19,26 +15,38 @@ interface PatientInfoCardProps {
 }
 
 export function PatientInfoCard({ patient, onUpdate }: PatientInfoCardProps) {
-  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
-  const [newAvatarUrl, setNewAvatarUrl] = useState(patient.avatarUrl || "");
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleAvatarUpdate = async () => {
+    // Optional: Check file size/type before uploading
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File is too large (max 5MB)");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const toastId = toast.loading("Uploading profile picture...");
+
     try {
-      const response = await fetch(`${API_URL}/patients/${patient.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarUrl: newAvatarUrl }),
+      const response = await fetch(`${API_URL}/patients/${patient.id}/avatar`, {
+        method: "POST",
+        body: formData,
         credentials: "include",
       });
 
-      if (!response.ok) throw new Error("Failed to update avatar");
+      if (!response.ok) throw new Error("Failed to upload avatar");
 
-      toast.success("Avatar updated successfully");
+      toast.success("Profile picture updated", { id: toastId });
       onUpdate();
-      setIsAvatarDialogOpen(false);
     } catch (error) {
-      toast.error("Failed to update avatar");
+      toast.error("Failed to upload profile picture", { id: toastId });
       console.error(error);
+    } finally {
+      // Reset the input value so the same file can be selected again if needed
+      e.target.value = "";
     }
   };
 
@@ -64,42 +72,24 @@ export function PatientInfoCard({ patient, onUpdate }: PatientInfoCardProps) {
                   .toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="absolute bottom-0 right-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Update Profile Picture</DialogTitle>
-                  <DialogDescription>
-                    Enter the URL of the new profile picture.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="avatar-url" className="text-right">
-                      Image URL
-                    </Label>
-                    <Input
-                      id="avatar-url"
-                      value={newAvatarUrl}
-                      onChange={(e) => setNewAvatarUrl(e.target.value)}
-                      className="col-span-3"
-                      placeholder="https://example.com/avatar.jpg"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button onClick={handleAvatarUpdate}>Save changes</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              id="avatar-upload"
+              className="hidden"
+              accept="image/*"
+              onChange={handleFileChange}
+            />
+            
+            {/* Label acts as the trigger button */}
+            <label
+              htmlFor="avatar-upload"
+              className="absolute bottom-0 right-0 rounded-full bg-secondary text-secondary-foreground p-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-secondary/80 shadow-sm"
+              title="Change Profile Picture"
+            >
+              <Edit className="h-4 w-4" />
+            </label>
           </div>
 
           <div className="flex-1 text-center md:text-left space-y-4">

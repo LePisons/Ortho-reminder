@@ -16,8 +16,13 @@ async function bootstrap() {
 
   // Ensure uploads directory exists
   const uploadsDir = join(process.cwd(), 'uploads', 'patient-images');
+  const avatarsDir = join(process.cwd(), 'uploads', 'avatars');
+  
   if (!existsSync(uploadsDir)) {
     mkdirSync(uploadsDir, { recursive: true });
+  }
+  if (!existsSync(avatarsDir)) {
+    mkdirSync(avatarsDir, { recursive: true });
   }
 
   // Serve uploaded files as static assets

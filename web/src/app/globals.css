@@ -41,6 +41,12 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Pixel Art Theme */
+  --font-pixel: var(--font-pixel);
+  --color-pixel-dark-green: #254F22;
+  --color-pixel-brown: #A03A13;
+  --color-pixel-orange: #F5824A;
+  --color-pixel-beige: #EDE4C2;
 }
 
 :root {

@@ -172,4 +172,10 @@ export class PatientsService {
       totalPages: Math.ceil(sortedPatients.length / limit),
     };
   }
+  async uploadAvatar(id: string, url: string) {
+    return this.prisma.patient.update({
+      where: { id },
+      data: { avatarUrl: url },
+    });
+  }
 }

@@ -108,13 +108,13 @@ export default function HomePage() {
   return (
     <div>
       {/* Main Page Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <div className="flex justify-between items-center mb-10">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
         {/* The "Add Patient" button could also live here */}
       </div>
 
       {/* Stat Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
         <StatCard title="Active Patients" value={stats.active} />
         <StatCard title="Paused Patients" value={stats.paused} />
         <StatCard title="Finished Patients" value={stats.finished} />
@@ -123,7 +123,7 @@ export default function HomePage() {
       {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column (takes up 2/3 of the space on large screens) */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border-transparent">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Patient List</h2>
             <AddPatientDialog onPatientAdded={handleDataChange} />
@@ -137,8 +137,8 @@ export default function HomePage() {
         </div>
 
         {/* Right Column (takes up 1/3 of the space) */}
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="space-y-8">
+          <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border-transparent">
             <h2 className="text-lg font-semibold mb-4">Upcoming Changes</h2>
 
             <UpcomingChangesList
@@ -148,7 +148,7 @@ export default function HomePage() {
               onPageChange={handleUpcomingPageChange}
             />
           </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border-transparent">
             <h2 className="text-lg font-semibold mb-4">Activity Feed</h2>
             <p className="text-gray-500">Feature coming soon...</p>
           </div>

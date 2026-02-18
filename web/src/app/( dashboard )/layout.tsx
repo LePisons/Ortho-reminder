@@ -13,24 +13,26 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-100 p-6 border-r border-gray-200">
-        <h2 className="text-xl font-bold mb-8">OrthoReminder</h2>
+      <aside className="w-64 bg-white p-6 border-r border-gray-100">
+        <h2 className="text-xl font-bold mb-8 tracking-tight text-gray-900">OrthoReminder</h2>
         <nav className="flex flex-col gap-1">
           {/* 4. Update the Links with conditional styling */}
           <Link
             href="/"
-            className={`p-2 rounded-md text-gray-700 hover:bg-gray-200 hover:text-black ${
-              pathname === "/" ? "bg-blue-100 text-blue-700 font-semibold" : ""
+            className={`p-2 rounded-md text-sm font-medium transition-colors ${
+              pathname === "/" 
+                ? "bg-slate-50 text-slate-900 border-l-4 border-[#254F22]" 
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             }`}
           >
             Dashboard
           </Link>
           <Link
             href="/history"
-            className={`p-2 rounded-md text-gray-700 hover:bg-gray-200 hover:text-black ${
+            className={`p-2 rounded-md text-sm font-medium transition-colors ${
               pathname === "/history"
-                ? "bg-blue-100 text-blue-700 font-semibold"
-                : ""
+                ? "bg-slate-50 text-slate-900 border-l-4 border-[#254F22]"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             }`}
           >
             Message History

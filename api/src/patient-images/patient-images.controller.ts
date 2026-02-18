@@ -82,6 +82,17 @@ export class PatientImagesController {
     return this.patientImagesService.update(id, updatePatientImageDto);
   }
 
+  @Delete('session')
+  removeSession(
+    @Query('patientId') patientId: string,
+    @Query('date') date: string,
+  ) {
+    if (!patientId || !date) {
+      throw new BadRequestException('Patient ID and date are required');
+    }
+    return this.patientImagesService.removeSession(patientId, date);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.patientImagesService.remove(id);

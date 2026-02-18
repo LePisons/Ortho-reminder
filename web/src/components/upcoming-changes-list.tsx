@@ -34,19 +34,19 @@ export function UpcomingChangesList({
     <>
       <ul className="space-y-4">
         {patients.map((patient) => (
-          <li key={patient.id} className="flex items-center justify-between">
+          <li key={patient.id} className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-gray-50 transition-colors">
             <div>
-              <p className="font-semibold">{patient.fullName}</p>
-              <p className="text-xs text-gray-500">
+              <p className="font-semibold text-gray-900">{patient.fullName}</p>
+              <p className="text-xs text-gray-500 mt-0.5 font-medium uppercase tracking-wide">
                 Now on Aligner #{patient.currentAligner}
               </p>
             </div>
             <div className="text-right">
-              <p className="font-medium">
+              <p className="font-medium text-[#254F22]">
                 {patient.daysUntilNextChange} day
                 {patient.daysUntilNextChange !== 1 ? "s" : ""}
               </p>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 mt-0.5">
                 {new Date(patient.nextChangeDate).toLocaleDateString()}
               </p>
             </div>

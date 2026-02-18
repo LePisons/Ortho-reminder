@@ -35,3 +35,13 @@ export interface PatientImage {
   category?: string;
   patientId: string;
 }
+
+
+export interface Note {
+  id: string;
+  content: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+  patientId: string;
+}

@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-s
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { NotesPanel } from "@/components/notes-panel";
 
 export default function PatientDetailsPage() {
   const params = useParams();
@@ -62,41 +63,53 @@ export default function PatientDetailsPage() {
         Back to Dashboard
       </Button>
 
-      <PatientInfoCard patient={patient} onUpdate={fetchPatient} />
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* Main Content */}
+        <div className="xl:col-span-3 space-y-6">
+          <PatientInfoCard patient={patient} onUpdate={fetchPatient} />
 
-      {/* Clinical Summary — editable, always visible at the top */}
-      <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
+          {/* Clinical Summary — editable, always visible at the top */}
+          <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
 
-      <Tabs defaultValue="clinical" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="clinical">Clinical History</TabsTrigger>
-          <TabsTrigger value="photos">Photos</TabsTrigger>
-          <TabsTrigger value="xrays">X-Rays</TabsTrigger>
-        </TabsList>
-        <TabsContent value="clinical">
-          <ClinicalTab
-            patientId={patient.id}
-            records={patient.clinicalRecords || []}
-            onUpdate={fetchPatient}
-          />
-        </TabsContent>
-        <TabsContent value="photos">
-          <ImagesTab
-            patientId={patient.id}
-            images={patient.patientImages || []}
-            type="PHOTO"
-            onUpdate={fetchPatient}
-          />
-        </TabsContent>
-        <TabsContent value="xrays">
-          <ImagesTab
-            patientId={patient.id}
-            images={patient.patientImages || []}
-            type="XRAY"
-            onUpdate={fetchPatient}
-          />
-        </TabsContent>
-      </Tabs>
+          <Tabs defaultValue="clinical" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="clinical">Clinical History</TabsTrigger>
+              <TabsTrigger value="photos">Photos</TabsTrigger>
+              <TabsTrigger value="xrays">X-Rays</TabsTrigger>
+            </TabsList>
+            <TabsContent value="clinical">
+              <ClinicalTab
+                patientId={patient.id}
+                records={patient.clinicalRecords || []}
+                onUpdate={fetchPatient}
+              />
+            </TabsContent>
+            <TabsContent value="photos">
+              <ImagesTab
+                patientId={patient.id}
+                images={patient.patientImages || []}
+                type="PHOTO"
+                onUpdate={fetchPatient}
+              />
+            </TabsContent>
+            <TabsContent value="xrays">
+              <ImagesTab
+                patientId={patient.id}
+                images={patient.patientImages || []}
+                type="XRAY"
+                onUpdate={fetchPatient}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Notes Panel - Side Column */}
+        <div className="xl:col-span-1">
+          <div className="sticky top-6 bg-white rounded-xl shadow-sm border overflow-hidden h-[calc(100vh-120px)]">
+            <NotesPanel patientId={patient.id} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

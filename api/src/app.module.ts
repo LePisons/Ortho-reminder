@@ -10,6 +10,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ClinicalRecordsModule } from './clinical-records/clinical-records.module';
 import { PatientImagesModule } from './patient-images/patient-images.module';
+import { NotesModule } from './notes/notes.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PatientImagesModule } from './patient-images/patient-images.module';
     AuthModule,
     ClinicalRecordsModule,
     PatientImagesModule,
+    NotesModule,
   ],
   controllers: [],
   providers: [ReminderService, TwilioService],

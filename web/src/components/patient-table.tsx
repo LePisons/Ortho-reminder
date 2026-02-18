@@ -60,22 +60,22 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
   return (
     <Table>
       <TableCaption>Lista de los últimos pacientes</TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Full Name</TableHead>
-          <TableHead>RUT</TableHead>
-          <TableHead>Phone</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Start Date</TableHead>
-          <TableHead className="text-right">Change Frequency</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+      <TableHeader className="bg-gray-50/50">
+        <TableRow className="hover:bg-transparent border-gray-100">
+          <TableHead className="text-xs uppercase tracking-wider text-gray-500 font-medium">Full Name</TableHead>
+          <TableHead className="text-xs uppercase tracking-wider text-gray-500 font-medium">RUT</TableHead>
+          <TableHead className="text-xs uppercase tracking-wider text-gray-500 font-medium">Phone</TableHead>
+          <TableHead className="text-xs uppercase tracking-wider text-gray-500 font-medium">Status</TableHead>
+          <TableHead className="text-xs uppercase tracking-wider text-gray-500 font-medium">Start Date</TableHead>
+          <TableHead className="text-right text-xs uppercase tracking-wider text-gray-500 font-medium">Change Frequency</TableHead>
+          <TableHead className="text-right text-xs uppercase tracking-wider text-gray-500 font-medium">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {patients.map((patient) => (
-          <TableRow key={patient.id}>
+          <TableRow key={patient.id} className="hover:bg-gray-50/50 transition-colors border-gray-100">
             <TableCell className="font-medium">
-              <Link href={`/patients/${patient.id}`} className="hover:underline text-blue-600">
+              <Link href={`/patients/${patient.id}`} className="hover:text-[#254F22] text-gray-900 transition-colors font-semibold">
                 {patient.fullName}
               </Link>
             </TableCell>

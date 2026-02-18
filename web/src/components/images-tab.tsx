@@ -9,6 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PatientImage } from "@/lib/types";
@@ -36,6 +46,13 @@ import {
   PanoramicXraySvg,
   LateralXraySvg,
 } from "@/components/dental-illustrations";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
 // ─── Slot definitions ──────────────────────────────────────────────────────
 
@@ -177,6 +194,10 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
 
   // Delete confirm
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteSessionTarget, setDeleteSessionTarget] = useState<{
+    dateKey: string;
+    displayDate: string;
+  } | null>(null);
 
   const toggleDate = (dateKey: string) => {
     setExpandedDates((prev) => {
@@ -261,6 +282,33 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
       onUpdate();
     } catch (error) {
       toast.error("Failed to delete image");
+      console.error(error);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!deleteSessionTarget) return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/patient-images/session?patientId=${patientId}&date=${deleteSessionTarget.dateKey}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+      if (!response.ok) throw new Error("Failed to delete session");
+      toast.success("Session deleted");
+      setDeleteSessionTarget(null);
+      // Remove from expanded if present
+      setExpandedDates((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteSessionTarget.dateKey);
+        return next;
+      });
+      onUpdate();
+    } catch (error) {
+      toast.error("Failed to delete session");
       console.error(error);
     }
   };
@@ -422,21 +470,43 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
                 className="border rounded-lg overflow-hidden"
               >
                 {/* Folder header */}
-                <button
-                  onClick={() => toggleDate(dateKey)}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" />
-                  )}
-                  <FolderOpen className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span className="font-medium text-sm">{displayDate}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {filledCount}/{slots.length}
-                  </span>
-                </button>
+                <div className="flex items-center justify-between bg-gray-50 px-4 py-3 hover:bg-gray-100 transition-colors">
+                  <button
+                    onClick={() => toggleDate(dateKey)}
+                    className="flex items-center gap-3 flex-1 text-left"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" />
+                    )}
+                    <FolderOpen className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="font-medium text-sm">{displayDate}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {filledCount}/{slots.length}
+                    </span>
+                  </button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteSessionTarget({ dateKey, displayDate });
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Session
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
 
                 {/* Grid content */}
                 {isExpanded && (
@@ -563,6 +633,38 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Session confirmation dialog */}
+      <AlertDialog
+        open={!!deleteSessionTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteSessionTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Session</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the session for{" "}
+              <span className="font-medium">
+                {deleteSessionTarget?.displayDate}
+              </span>
+              ? All images in this session will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteSessionTarget(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
