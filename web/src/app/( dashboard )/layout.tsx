@@ -28,6 +28,16 @@ export default function DashboardLayout({
             Dashboard
           </Link>
           <Link
+            href="/calendar"
+            className={`p-2 rounded-md text-sm font-medium transition-colors ${
+              pathname === "/calendar"
+                ? "bg-slate-50 text-slate-900 border-l-4 border-[#254F22]"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            Calendar
+          </Link>
+          <Link
             href="/history"
             className={`p-2 rounded-md text-sm font-medium transition-colors ${
               pathname === "/history"

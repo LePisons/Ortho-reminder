@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReminderService } from './reminder/reminder.service';
@@ -11,9 +12,12 @@ import { AuthModule } from './auth/auth.module';
 import { ClinicalRecordsModule } from './clinical-records/clinical-records.module';
 import { PatientImagesModule } from './patient-images/patient-images.module';
 import { NotesModule } from './notes/notes.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { TodoistModule } from './integrations/todoist/todoist.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     PatientsModule,
     ScheduleModule.forRoot(),
     MessageLogModule,
@@ -23,6 +27,8 @@ import { NotesModule } from './notes/notes.module';
     ClinicalRecordsModule,
     PatientImagesModule,
     NotesModule,
+    AppointmentsModule,
+    TodoistModule,
   ],
   controllers: [],
   providers: [ReminderService, TwilioService],

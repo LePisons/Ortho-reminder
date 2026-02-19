@@ -35,6 +35,7 @@ model Patient {
   clinicalRecords    ClinicalRecord[]
   patientImages      PatientImage[]
   notes              Note[]
+  appointments       Appointment[]
 }
 
 model ClinicalRecord {
@@ -74,6 +75,30 @@ model Note {
 
   patientId String
   patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  title       String
+  start       DateTime
+  end         DateTime
+  allDay      Boolean           @default(false)
+  status      AppointmentStatus @default(SCHEDULED)
+  description String?
+  
+  patientId   String?
+  patient     Patient?          @relation(fields: [patientId], references: [id])
+
+  todoistTaskId String?         @unique
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 }
 
 model MessageLog {

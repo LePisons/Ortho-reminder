@@ -1,11 +1,11 @@
 "use client"; // This must be the very first line
 
 import { useEffect, useState, useCallback, useRef } from "react"; // Import React hooks
-import { PatientTable } from "@/components/patient-table";
-import { AddPatientDialog } from "@/components/add-patient-dialog";
-import { StatCard } from "@/components/stat-card";
-import { UpcomingChangesList } from "@/components/upcoming-changes-list";
-import { PaginationControls } from "@/components/pagination-controls";
+import { PatientTable } from "@/components/features/patients/patient-table";
+import { AddPatientDialog } from "@/components/features/patients/add-patient-dialog";
+import { StatCard } from "@/components/features/dashboard/stat-card";
+import { UpcomingChangesList } from "@/components/features/dashboard/upcoming-changes-list";
+import { PaginationControls } from "@/components/features/patients/pagination-controls";
 import { API_URL } from "@/lib/utils";
 // We define a Type for our patient data to make our code safer
 export type Patient = {

@@ -45,7 +45,7 @@ import {
   IntraoralLeftSvg,
   PanoramicXraySvg,
   LateralXraySvg,
-} from "@/components/dental-illustrations";
+} from "./dental-illustrations";
 import {
   DropdownMenu,
   DropdownMenuContent,

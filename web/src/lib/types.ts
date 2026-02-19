@@ -45,3 +45,21 @@ export interface Note {
   updatedAt: string;
   patientId: string;
 }
+
+
+export type AppointmentStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+
+export interface Appointment {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  status: AppointmentStatus;
+  description?: string;
+  patientId?: string;
+  patient?: {
+    id: string;
+    fullName: string;
+  };
+}

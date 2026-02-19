@@ -4,15 +4,15 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { API_URL } from "@/lib/utils";
 import { Patient } from "@/lib/types";
-import { PatientInfoCard } from "@/components/patient-info-card";
-import { PatientSummaryCard } from "@/components/patient-summary-card";
-import { ClinicalTab } from "@/components/clinical-tab";
-import { ImagesTab } from "@/components/images-tab";
+import { PatientInfoCard } from "@/components/features/patients/patient-info-card";
+import { PatientSummaryCard } from "@/components/features/patients/patient-summary-card";
+import { ClinicalTab } from "@/components/features/clinical/clinical-tab";
+import { ImagesTab } from "@/components/features/clinical/images-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { NotesPanel } from "@/components/notes-panel";
+import { NotesPanel } from "@/components/features/dashboard/notes-panel";
 
 export default function PatientDetailsPage() {
   const params = useParams();

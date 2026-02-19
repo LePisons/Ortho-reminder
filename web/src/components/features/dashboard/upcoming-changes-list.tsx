@@ -1,5 +1,5 @@
 // We'll define a more specific type for the data this component needs
-import { PaginationControls } from "./pagination-controls";
+import { PaginationControls } from "@/components/features/patients/pagination-controls";
 
 type UpcomingPatient = {
   id: string;
