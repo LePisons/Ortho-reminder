@@ -1,68 +1,88 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_URL } from '@/lib/utils';
 
 interface User {
   id: string;
   email: string;
   name?: string;
+  createdAt?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  login: () => void;
-  logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+      const res = await fetch(`${API_URL}/auth/profile`, {
         credentials: 'include',
       });
       if (res.ok) {
         const userData = await res.json();
         setUser(userData);
-        setToken('cookie'); // Dummy value to indicate auth
       } else {
         setUser(null);
-        setToken(null);
       }
     } catch {
       setUser(null);
-      setToken(null);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const login = async () => {
     await checkAuth();
-    router.push('/'); // Redirect to dashboard (root) after login
+    router.push('/');
   };
 
-  const logout = () => {
-    // In a real app, call an API endpoint to clear the cookie
-    // For now, we just clear the state and redirect, but the cookie remains until cleared by server or expiry
-    // Ideally: await fetch('/auth/logout', { method: 'POST' });
+  const logout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Even if the call fails, clear local state
+    }
     setUser(null);
-    setToken(null);
     router.push('/login');
   };
 
+  const refreshUser = async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/profile`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const userData = await res.json();
+        setUser(userData);
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

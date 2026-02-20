@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { API_URL, cn } from "@/lib/utils";
 import { Appointment, Patient } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 
 export function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -164,6 +163,7 @@ export function CalendarView() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDate]);
 
 
@@ -182,7 +182,7 @@ export function CalendarView() {
           toast.success("Appointment deleted");
           setIsDetailsOpen(false);
           fetchAppointments();
-      } catch (error) {
+      } catch {
           toast.error("Failed to delete appointment");
       }
   };
@@ -237,7 +237,7 @@ export function CalendarView() {
                         if (!res.ok) throw new Error("Sync failed");
                         toast.success("Synced successfully", { id: toastId });
                         fetchAppointments();
-                    } catch (err) {
+                    } catch {
                         toast.error("Failed to sync", { id: toastId });
                     }
                 }}
@@ -314,7 +314,7 @@ export function CalendarView() {
                 </div>
              ))
         ) : (
-            calendarDays.map((day, dayIdx) => {
+            calendarDays.map((day) => {
                 const isCurrentMonth = isSameMonth(day, monthStart);
                 const isTodayDate = isToday(day);
                 const dayAppointments = appointments.filter(appt => isSameDay(parseISO(appt.start), day));
