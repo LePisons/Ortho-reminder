@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Patient" ADD COLUMN     "batchPhase" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN     "batchStartDate" TIMESTAMP(3),
+ADD COLUMN     "currentAligner" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN     "totalAligners" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "wearDaysPerAligner" INTEGER NOT NULL DEFAULT 14;

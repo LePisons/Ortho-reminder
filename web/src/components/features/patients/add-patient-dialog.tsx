@@ -51,13 +51,18 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
       rut: "",
       email: "",
       phone: "",
-      changeFrequency: 10, // Default value
+      changeFrequency: 14, // Default to 14 as per old requirement
+      totalAligners: 0,
+      currentAligner: 1,
+      wearDaysPerAligner: 14,
       treatmentStartDate: getTodayDateString(), // Defaults to today's date in YYYY-MM-DD format
     },
   });
 
   // 2. Define a submit handler.
   async function onSubmit(values: Record<string, unknown>) {
+    // Sync wearDaysPerAligner with changeFrequency since they represent the same thing
+    values.wearDaysPerAligner = values.changeFrequency;
     try {
       const response = await fetch(`${API_URL}/patients`, {
         method: "POST",
@@ -69,7 +74,9 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Something went wrong with the API call");
+        const errText = await response.text();
+        console.error("Backend Error Response:", errText);
+        throw new Error(`API returned ${response.status}: ${errText}`);
       }
 
       // This is where we will add the "refresh" logic later
@@ -176,7 +183,24 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
               name="changeFrequency"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Change Frequency (days)</FormLabel>
+                  <FormLabel>Change Frequency (Wear Days)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(event) => field.onChange(+event.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="totalAligners"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Total Aligners</FormLabel>
                   <FormControl>
                     <Input
                       type="number"

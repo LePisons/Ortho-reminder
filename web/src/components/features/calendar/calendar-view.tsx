@@ -13,16 +13,32 @@ import { API_URL, cn } from "@/lib/utils";
 import { Appointment, Patient } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const EVENT_COLORS = [
+    "bg-blue-50 text-blue-700 border-l-blue-500 hover:bg-blue-100 ring-1 ring-blue-500/10",
+    "bg-purple-50 text-purple-700 border-l-purple-500 hover:bg-purple-100 ring-1 ring-purple-500/10",
+    "bg-amber-50 text-amber-700 border-l-amber-500 hover:bg-amber-100 ring-1 ring-amber-500/10",
+    "bg-rose-50 text-rose-700 border-l-rose-500 hover:bg-rose-100 ring-1 ring-rose-500/10",
+    "bg-emerald-50 text-emerald-700 border-l-emerald-500 hover:bg-emerald-100 ring-1 ring-emerald-500/10",
+];
+
+const getEventColor = (id: string) => {
+    let hash = 0;
+    for (let i = 0; i < Math.min(id.length, 10); i++) {
+        hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return EVENT_COLORS[Math.abs(hash) % EVENT_COLORS.length];
+};
+
 export function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Appointment Dialog State
+  // Event Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newApptTitle, setNewApptTitle] = useState("");
-  const [newApptStart, setNewApptStart] = useState(""); // YYYY-MM-DDTHH:mm
-  const [newApptEnd, setNewApptEnd] = useState("");
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventStart, setNewEventStart] = useState(""); // YYYY-MM-DDTHH:mm
+  const [newEventEnd, setNewEventEnd] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<string>("");
   const [patients, setPatients] = useState<Patient[]>([]);
 
@@ -65,7 +81,7 @@ export function CalendarView() {
   }, [fetchAppointments, fetchPatients]);
 
   const handleCreateAppointment = async () => {
-    if (!newApptTitle || !newApptStart || !newApptEnd) {
+    if (!newEventTitle || !newEventStart || !newEventEnd) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -75,26 +91,26 @@ export function CalendarView() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                title: newApptTitle,
-                start: new Date(newApptStart).toISOString(),
-                end: new Date(newApptEnd).toISOString(),
+                title: newEventTitle,
+                start: new Date(newEventStart).toISOString(),
+                end: new Date(newEventEnd).toISOString(),
                 patientId: selectedPatient || undefined,
             }),
             credentials: "include",
         });
 
-        if (!response.ok) throw new Error("Failed to create appointment");
+        if (!response.ok) throw new Error("Failed to create event");
         
-        toast.success("Appointment created");
+        toast.success("Event created");
         setIsDialogOpen(false);
-        setNewApptTitle("");
-        setNewApptStart("");
-        setNewApptEnd("");
+        setNewEventTitle("");
+        setNewEventStart("");
+        setNewEventEnd("");
         setSelectedPatient("");
         fetchAppointments();
     } catch (error) {
         console.error(error);
-        toast.error("Failed to create appointment");
+        toast.error("Failed to create event");
     }
   };
 
@@ -142,13 +158,13 @@ export function CalendarView() {
             credentials: "include",
         });
 
-        if (!response.ok) throw new Error("Failed to move appointment");
+        if (!response.ok) throw new Error("Failed to move event");
         
-        toast.success("Appointment moved");
+        toast.success("Event moved");
         fetchAppointments();
     } catch (error) {
         console.error(error);
-        toast.error("Failed to move appointment");
+        toast.error("Failed to move event");
     } finally {
         setDraggedAppointment(null);
     }
@@ -178,12 +194,12 @@ export function CalendarView() {
               method: "DELETE",
               credentials: "include",
           });
-          if (!response.ok) throw new Error("Failed to delete appointment");
-          toast.success("Appointment deleted");
+          if (!response.ok) throw new Error("Failed to delete event");
+          toast.success("Event deleted");
           setIsDetailsOpen(false);
           fetchAppointments();
       } catch {
-          toast.error("Failed to delete appointment");
+          toast.error("Failed to delete event");
       }
   };
 
@@ -207,7 +223,7 @@ export function CalendarView() {
       <div className="flex items-center justify-between px-6 py-6 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-6">
           <h2 className="text-3xl font-bold text-gray-900 capitalize tracking-tight flex items-center gap-3">
-            <CalendarIcon className="h-8 w-8 text-primary" />
+            <CalendarIcon className="h-8 w-8 text-emerald-400 drop-shadow-sm" />
             {format(currentDate, "MMMM yyyy")}
           </h2>
           <div className="flex items-center rounded-lg border border-gray-300 bg-white shadow-sm ring-1 ring-gray-950/5">
@@ -249,31 +265,31 @@ export function CalendarView() {
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                    <Button className="gap-2 shadow-md text-base font-semibold px-6 py-5 bg-primary hover:bg-primary/90">
-                        <Plus className="h-5 w-5" /> New Appointment
+                    <Button className="gap-2 shadow-sm text-sm font-semibold px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground border-0 transition-all active:scale-95">
+                        <Plus className="h-4 w-4" /> New Event
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[450px]">
                     <DialogHeader>
-                        <DialogTitle className="text-xl">Create Appointment</DialogTitle>
+                        <DialogTitle className="text-xl">Create Event</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-5 py-5">
                         <div className="grid gap-2">
-                            <Label htmlFor="title" className="text-base">Title</Label>
-                            <Input id="title" value={newApptTitle} onChange={e => setNewApptTitle(e.target.value)} placeholder="Check-up, Adjustment..." className="text-base" />
+                            <Label htmlFor="title" className="text-sm font-semibold">Title</Label>
+                            <Input id="title" value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} placeholder="Check-up, Adjustment..." className="text-sm" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="start" className="text-base">Start</Label>
-                                <Input id="start" type="datetime-local" value={newApptStart} onChange={e => setNewApptStart(e.target.value)} className="text-base" />
+                                <Label htmlFor="start" className="text-sm font-semibold">Start</Label>
+                                <Input id="start" type="datetime-local" value={newEventStart} onChange={e => setNewEventStart(e.target.value)} className="text-sm border-gray-200 focus-visible:ring-primary shadow-sm" />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="end" className="text-base">End</Label>
-                                <Input id="end" type="datetime-local" value={newApptEnd} onChange={e => setNewApptEnd(e.target.value)} className="text-base" />
+                                <Label htmlFor="end" className="text-sm font-semibold">End</Label>
+                                <Input id="end" type="datetime-local" value={newEventEnd} onChange={e => setNewEventEnd(e.target.value)} className="text-sm border-gray-200 focus-visible:ring-primary shadow-sm" />
                             </div>
                         </div>
                         <div className="grid gap-2">
-                             <Label className="text-base">Patient (Optional)</Label>
+                             <Label className="text-sm font-semibold">Patient (Optional)</Label>
                              <Select value={selectedPatient} onValueChange={setSelectedPatient}>
                                 <SelectTrigger className="text-base">
                                     <SelectValue placeholder="Select patient..." />
@@ -287,7 +303,7 @@ export function CalendarView() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={handleCreateAppointment} size="lg" className="w-full text-base">Create Appointment</Button>
+                        <Button onClick={handleCreateAppointment} size="lg" className="w-full text-base bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">Save Event</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -295,19 +311,19 @@ export function CalendarView() {
       </div>
 
       {/* Days Header */}
-      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+      <div className="grid grid-cols-7 border-b border-gray-100 bg-white">
         {weekDays.map(day => (
-            <div key={day} className="py-4 text-center text-sm font-bold text-gray-600 uppercase tracking-wider">
+            <div key={day} className="py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-[0.15em]">
                 {day}
             </div>
         ))}
       </div>
 
       {/* Calendar Grid */}
-      <div className="flex-1 bg-gray-200 gap-px grid grid-cols-7 grid-rows-6 border-b border-gray-200">
+      <div className="flex-1 bg-gray-100 gap-px grid grid-cols-7 grid-rows-6 border-b border-gray-100 min-h-0">
         {loading ? (
              Array.from({ length: 42 }).map((_, i) => (
-                <div key={i} className="bg-white p-3 min-h-[120px]">
+                <div key={i} className="bg-white p-3 min-h-0 h-full">
                     <Skeleton className="h-8 w-8 rounded-full mb-3" />
                     <Skeleton className="h-5 w-full rounded mb-2" />
                     <Skeleton className="h-5 w-3/4 rounded" />
@@ -324,43 +340,57 @@ export function CalendarView() {
                         key={day.toString()} 
                         onDragOver={onDragOver}
                         onDrop={(e) => onDrop(e, day)}
+                        onClick={(e) => {
+                            // Only trigger new event if clicking the empty space of the cell
+                            if (e.target === e.currentTarget || (e.target as HTMLElement).tagName.toLowerCase() === 'div') {
+                                const formattedDate = format(day, "yyyy-MM-dd'T'12:00");
+                                const endFormattedDate = format(day, "yyyy-MM-dd'T'13:00");
+                                setNewEventStart(formattedDate);
+                                setNewEventEnd(endFormattedDate);
+                                setIsDialogOpen(true);
+                            }
+                        }}
                         className={cn(
-                            "min-h-[120px] bg-white p-2 transition-colors flex flex-col gap-1 group relative",
-                            !isCurrentMonth && "bg-gray-50/40 text-gray-400",
-                            isCurrentMonth && "hover:bg-blue-50/30"
+                            "min-h-0 h-full bg-white p-2.5 transition-colors flex flex-col gap-1 group relative cursor-crosshair",
+                            !isCurrentMonth && "text-gray-300",
+                            isCurrentMonth && "hover:bg-primary/5"
                         )}
                     >
-                        <div className="flex justify-between items-start mb-1">
+                        <div className="flex justify-between items-start mb-1 shrink-0">
                             <span className={cn(
-                                "text-base font-bold w-8 h-8 flex items-center justify-center rounded-full transition-all",
+                                "text-sm font-medium w-8 h-8 flex items-center justify-center rounded-full transition-all pointer-events-none",
                                 isTodayDate 
-                                    ? "bg-primary text-primary-foreground shadow-md scale-110" 
-                                    : "text-gray-700 group-hover:text-gray-900"
+                                    ? "bg-primary text-white shadow-sm ring-4 ring-primary/10 font-bold" 
+                                    : "text-gray-600 group-hover:text-primary"
                             )}>
                                 {format(day, 'd')}
                             </span>
                         </div>
                         
                         {/* Events */}
-                        <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar">
+                        <div className="flex-1 flex flex-col gap-1 overflow-y-auto overflow-x-hidden min-h-0 scrollbar-thin scrollbar-thumb-gray-300">
                             {dayAppointments.map(appt => (
                                 <div 
                                     key={appt.id}
                                     draggable
-                                    onDragStart={(e) => onDragStart(e, appt)}
-                                    onClick={() => {
+                                    onDragStart={(e) => {
+                                        e.stopPropagation();
+                                        onDragStart(e, appt);
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         setSelectedEvent(appt);
                                         setIsDetailsOpen(true);
                                     }}
                                     className={cn(
-                                        "px-2.5 py-1.5 text-xs font-semibold rounded-md truncate cursor-pointer shadow-sm border transition-all hover:scale-[1.02] hover:shadow-md flex items-center gap-1.5",
-                                        "bg-blue-600 text-white border-blue-700 hover:bg-blue-700", // High contrast style
+                                        "px-2 py-1.5 text-xs font-semibold rounded-md truncate cursor-pointer shadow-sm transition-all hover:-translate-y-[1px] flex flex-col xl:flex-row items-start xl:items-center gap-1 shrink-0 border-l-[3px]",
+                                        getEventColor(appt.id), 
                                     )}
                                     title={`${format(parseISO(appt.start), 'HH:mm')} - ${appt.title}`}
                                 >
-                                    <Clock className="h-3 w-3 shrink-0 opacity-80" />
-                                    <span className="opacity-90 font-mono text-[10px]">{format(parseISO(appt.start), 'HH:mm')}</span>
-                                    <span className="truncate">{appt.title}</span>
+                                    <Clock className="hidden xl:block h-3 w-3 shrink-0 opacity-50" />
+                                    <span className="opacity-80 font-semibold text-[10px] xl:text-xs tracking-tight shrink-0">{format(parseISO(appt.start), 'HH:mm')}</span>
+                                    <span className="truncate flex-1 font-semibold">{appt.title}</span>
                                 </div>
                             ))}
                         </div>
@@ -370,11 +400,26 @@ export function CalendarView() {
         )}
       </div>
 
+      {/* Useful Info Block */}
+      <div className="bg-emerald-50/50 border-t border-emerald-100/50 p-4 shrink-0 flex items-center justify-between">
+         <div className="flex items-center gap-4">
+             <div className="h-10 w-10 rounded-full bg-emerald-100/80 flex items-center justify-center shadow-sm">
+                 <CalendarIcon className="h-5 w-5 text-emerald-600" />
+             </div>
+             <div>
+                 <p className="text-sm font-bold text-emerald-900">Weekly Orthodontic Overview</p>
+                 <p className="text-xs text-emerald-700 font-medium">
+                     You have {appointments.filter(a => new Date(a.start) >= new Date() && new Date(a.start) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)).length} upcoming events in the next 7 days.
+                 </p>
+             </div>
+         </div>
+      </div>
+
       {/* Event Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-                <DialogTitle className="text-xl">Appointment Details</DialogTitle>
+                <DialogTitle className="text-xl">Event Details</DialogTitle>
             </DialogHeader>
             {selectedEvent && (
                 <div className="space-y-4 py-4">

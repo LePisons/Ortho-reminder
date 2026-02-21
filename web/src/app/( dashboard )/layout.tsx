@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
+import { LayoutDashboard, CalendarDays, MessageSquare } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: "📊" },
-  { href: "/calendar", label: "Calendar", icon: "📅" },
-  { href: "/history", label: "Message History", icon: "💬" },
+  { href: "/", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+  { href: "/calendar", label: "Calendar", icon: <CalendarDays className="w-5 h-5" /> },
+  { href: "/history", label: "Message History", icon: <MessageSquare className="w-5 h-5" /> },
 ];
 
 function UserMenu() {
@@ -39,22 +40,22 @@ function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 rounded-lg p-2.5 transition-all duration-200 hover:bg-gray-50 group"
+        className="flex w-full items-center gap-3 rounded-2xl p-2.5 transition-all duration-200 hover:bg-white/10 group focus:outline-none"
       >
         {/* Avatar */}
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#254F22] to-[#3a7a35] text-white text-xs font-semibold shadow-sm">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-primary text-sm font-bold shadow-sm">
           {initials}
         </div>
         {/* Info */}
         <div className="flex-1 overflow-hidden text-left">
-          <p className="truncate text-sm font-medium text-gray-900">
+          <p className="truncate text-sm font-bold text-white">
             {user?.name || "User"}
           </p>
-          <p className="truncate text-xs text-gray-500">{user?.email}</p>
+          <p className="truncate text-xs text-white/70">{user?.email}</p>
         </div>
         {/* Chevron */}
         <svg
-          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-white/50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -66,7 +67,7 @@ function UserMenu() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
+        <div className="absolute top-full left-0 right-0 mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 z-50">
           <div className="p-1.5">
             <Link
               href="/settings"
@@ -117,47 +118,50 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-slate-50">
       {/* Sidebar */}
-      <aside className="flex w-64 flex-col bg-white border-r border-gray-100">
+      <aside className="relative z-10 flex w-[280px] flex-col bg-[#3a7a35]/85 backdrop-blur-2xl border-r border-white/20 rounded-r-3xl shadow-2xl shrink-0 my-0 shadow-primary/20">
         {/* Logo */}
-        <div className="p-6 pb-4">
-          <h2 className="text-xl font-bold tracking-tight text-gray-900">
+        <div className="px-6 pt-10 pb-8 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl border-2 border-white/20 flex items-center justify-center shrink-0 shadow-sm">
+             <span className="text-white text-xl font-bold">O</span>
+          </div>
+          <h2 className="text-2xl font-black tracking-tight text-white">
             OrthoReminder
           </h2>
         </div>
 
+        {/* User Section */}
+        {isAuthenticated && (
+          <div className="px-4 pb-8 shrink-0">
+            <UserMenu />
+          </div>
+        )}
+
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col gap-1 px-4">
+        <nav className="flex flex-1 flex-col gap-2 px-4 pb-6">
           {navItems.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-4 px-4 py-3.5 text-sm transition-all duration-200 ${
                   isActive
-                    ? "bg-[#254F22]/5 text-[#254F22] border-l-[3px] border-[#254F22] pl-[calc(0.75rem-3px)]"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    ? "bg-white/10 text-white font-bold rounded-2xl shadow-sm border border-white/5 backdrop-blur-sm"
+                    : "text-white/70 hover:bg-white/5 hover:text-white font-medium rounded-2xl border border-transparent"
                 }`}
               >
-                <span className="text-base">{item.icon}</span>
+                <span className={`text-lg ${isActive ? 'opacity-100' : 'opacity-70'}`}>{item.icon}</span>
                 {item.label}
               </Link>
             );
           })}
         </nav>
-
-        {/* User Section */}
-        {isAuthenticated && (
-          <div className="border-t border-gray-100 p-4">
-            <UserMenu />
-          </div>
-        )}
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-10 bg-gray-50">{children}</main>
+      <main className="flex-1 p-10 flex flex-col overflow-y-auto max-h-screen relative">{children}</main>
     </div>
   );
 }

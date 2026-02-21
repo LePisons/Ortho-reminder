@@ -15,6 +15,11 @@ export class PatientsService {
 
   // This method now needs to be async to handle the message sending
   async create(createPatientDto: CreatePatientDto, userId: string) {
+    let batchStartDateObj: Date | undefined = undefined;
+    if (createPatientDto.batchStartDate) {
+      batchStartDateObj = new Date(createPatientDto.batchStartDate + 'T00:00:00');
+    }
+
     // Step 1: Create the patient in the database first
     const newPatient = await this.prisma.patient.create({
       data: {
@@ -24,6 +29,7 @@ export class PatientsService {
         treatmentStartDate: new Date(
           createPatientDto.treatmentStartDate + 'T00:00:00',
         ),
+        batchStartDate: batchStartDateObj,
       },
     });
 
@@ -43,7 +49,7 @@ export class PatientsService {
     }
 
     // Step 3: Return the data for the newly created patient
-    return newPatient;
+    return this.mapPatientWithUrgency(newPatient);
   }
 
   // The method now needs to accept page and limit, with defaults
@@ -61,7 +67,7 @@ export class PatientsService {
     ]);
 
     return {
-      data: patients,
+      data: patients.map(p => this.mapPatientWithUrgency(p)),
       total,
       page,
       limit,
@@ -69,14 +75,15 @@ export class PatientsService {
     };
   }
 
-  findOne(id: string) {
-    return this.prisma.patient.findUnique({
+  async findOne(id: string) {
+    const patient = await this.prisma.patient.findUnique({
       where: { id: id },
       include: {
         clinicalRecords: true,
         patientImages: true,
       },
     });
+    return patient ? this.mapPatientWithUrgency(patient) : null;
   }
 
   // Note: The update method could also be modified to handle dates correctly if needed
@@ -93,10 +100,18 @@ export class PatientsService {
       );
     }
 
-    return this.prisma.patient.update({
+    if (updatePatientDto.batchStartDate) {
+      dataToUpdate.batchStartDate = new Date(
+        updatePatientDto.batchStartDate + 'T00:00:00',
+      );
+    }
+
+    const updated = await this.prisma.patient.update({
       where: { id },
       data: dataToUpdate, // 4. Now this assignment is safe!
     });
+    
+    return this.mapPatientWithUrgency(updated);
   }
 
   remove(id: string) {
@@ -140,10 +155,7 @@ export class PatientsService {
       const nextChangeDate = new Date(today);
       nextChangeDate.setDate(today.getDate() + daysUntilNextChange);
 
-      const currentAligner =
-        daysSinceStart >= 0
-          ? Math.floor(daysSinceStart / patient.changeFrequency) + 1
-          : 1;
+      const currentAligner = patient.currentAligner || 1;
 
       return {
         id: patient.id,
@@ -177,5 +189,38 @@ export class PatientsService {
       where: { id },
       data: { avatarUrl: url },
     });
+  }
+
+  // Helper method to compute urgencyStatus and append to patient objects
+  private mapPatientWithUrgency(patient: any) {
+    if (!patient) return null;
+    
+    let urgencyStatus = 'ON_TRACK';
+    if (!patient.totalAligners || patient.totalAligners === 0) {
+      urgencyStatus = 'AWAITING_REEVALUATION';
+    } else if (patient.batchStartDate && patient.wearDaysPerAligner) {
+      const expectedEndDate = new Date(patient.batchStartDate);
+      // Wait, is it total aligners or current? The user requested total.
+      expectedEndDate.setDate(expectedEndDate.getDate() + (patient.totalAligners * patient.wearDaysPerAligner));
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const diffTime = expectedEndDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 3600 * 24));
+      
+      if (diffDays < 0) {
+        urgencyStatus = 'OVERDUE';
+      } else if (diffDays <= 14) {
+        urgencyStatus = 'ENDING_SOON';
+      }
+    } else {
+       urgencyStatus = 'ON_TRACK'; 
+    }
+
+    return {
+      ...patient,
+      urgencyStatus,
+    };
   }
 }

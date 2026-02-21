@@ -13,9 +13,9 @@ export class NotesService {
     });
   }
 
-  findAll(patientId: string) {
+  findAll(patientId?: string) {
     return this.prisma.note.findMany({
-      where: { patientId },
+      where: patientId ? { patientId } : { patientId: null },
       orderBy: { createdAt: 'desc' },
     });
   }

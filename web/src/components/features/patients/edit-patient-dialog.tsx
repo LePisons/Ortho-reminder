@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 
 import { useForm } from "react-hook-form";
-import type { Patient } from "@/app/( dashboard )/page"; // Import our Patient type
+import type { Patient } from "@/lib/types";
 
 // 1. Define the props this component will accept
 interface EditPatientDialogProps {
@@ -59,11 +59,16 @@ export function EditPatientDialog({
         .toISOString()
         .split("T")[0],
       changeFrequency: patient.changeFrequency,
+      totalAligners: patient.totalAligners || 0,
+      currentAligner: patient.currentAligner || 1,
     },
   });
 
   // 3. Define a placeholder submit handler
   async function onSubmit(values: Record<string, unknown>) {
+    // Sync wearDaysPerAligner with changeFrequency
+    values.wearDaysPerAligner = values.changeFrequency;
+    
     try {
       const response = await fetch(
         `${API_URL}/patients/${patient.id}`,
@@ -201,7 +206,41 @@ export function EditPatientDialog({
               name="changeFrequency"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Change Frequency (days)</FormLabel>
+                  <FormLabel>Change Frequency (Wear Days)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(event) => field.onChange(+event.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="totalAligners"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Total Aligners</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(event) => field.onChange(+event.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="currentAligner"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Current Aligner</FormLabel>
                   <FormControl>
                     <Input
                       type="number"

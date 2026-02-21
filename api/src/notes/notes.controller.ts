@@ -13,7 +13,7 @@ export class NotesController {
   }
 
   @Get()
-  findAll(@Query('patientId') patientId: string) {
+  findAll(@Query('patientId') patientId?: string) {
     return this.notesService.findAll(patientId);
   }
 

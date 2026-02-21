@@ -10,6 +10,11 @@ export interface Patient {
   avatarUrl?: string; // Optional field for profile picture
   diagnosis?: string;
   treatmentPlan?: string;
+  totalAligners?: number;
+  currentAligner?: number;
+  wearDaysPerAligner?: number;
+  batchStartDate?: string;
+  urgencyStatus?: 'ON_TRACK' | 'ENDING_SOON' | 'OVERDUE' | 'AWAITING_REEVALUATION';
   observations?: string;
   createdAt: string;
   updatedAt: string;

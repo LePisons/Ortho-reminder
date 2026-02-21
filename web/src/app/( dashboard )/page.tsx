@@ -7,17 +7,8 @@ import { StatCard } from "@/components/features/dashboard/stat-card";
 import { UpcomingChangesList } from "@/components/features/dashboard/upcoming-changes-list";
 import { PaginationControls } from "@/components/features/patients/pagination-controls";
 import { API_URL } from "@/lib/utils";
-// We define a Type for our patient data to make our code safer
-export type Patient = {
-  id: string;
-  rut: string;
-  fullName: string;
-  phone: string;
-  email: string;
-  treatmentStartDate: string;
-  changeFrequency: number;
-  status: "ACTIVE" | "PAUSED" | "FINISHED";
-};
+import { Patient } from "@/lib/types";
+import { Users, PauseCircle, CheckCircle2 } from "lucide-react";
 
 export default function HomePage() {
   // Create a state variable to hold our list of patients
@@ -115,42 +106,60 @@ export default function HomePage() {
 
       {/* Stat Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <StatCard title="Active Patients" value={stats.active} />
-        <StatCard title="Paused Patients" value={stats.paused} />
-        <StatCard title="Finished Patients" value={stats.finished} />
+        <StatCard 
+          title="Active Patients" 
+          value={stats.active} 
+          icon={<Users className="w-6 h-6" />} 
+          trend={{ value: 2, label: "this month", isPositive: true }}
+        />
+        <StatCard 
+          title="Paused Patients" 
+          value={stats.paused} 
+          icon={<PauseCircle className="w-6 h-6" />} 
+          trend={{ value: 0, label: "this month", isPositive: false }}
+        />
+        <StatCard 
+          title="Finished Patients" 
+          value={stats.finished} 
+          icon={<CheckCircle2 className="w-6 h-6" />} 
+          trend={{ value: 1, label: "this month", isPositive: true }}
+        />
       </div>
 
       {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column (takes up 2/3 of the space on large screens) */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border-transparent">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Patient List</h2>
-            <AddPatientDialog onPatientAdded={handleDataChange} />
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+          <div className="flex justify-between items-center p-6 border-b border-gray-100">
+            <h2 className="text-lg font-bold">Patient List</h2>
+            <div className="mr-2">
+              <AddPatientDialog onPatientAdded={handleDataChange} />
+            </div>
           </div>
-          <PatientTable patients={patients} onDataChange={handleDataChange} />
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-          />
+          <div className="p-0 overflow-x-auto">
+            <PatientTable patients={patients} onDataChange={handleDataChange} />
+          </div>
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-gray-100 bg-gray-50/30">
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right Column (takes up 1/3 of the space) */}
-        <div className="space-y-8">
-          <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border-transparent">
-            <h2 className="text-lg font-semibold mb-4">Upcoming Changes</h2>
-
+        <div className="space-y-6 bg-gray-50/50 rounded-2xl p-6 border border-gray-100/50 h-fit">
+          <div>
+            <h2 className="text-lg font-bold mb-6 flex items-center gap-2">Upcoming Changes</h2>
             <UpcomingChangesList
               patients={upcoming}
               currentPage={upcomingPage}
               totalPages={upcomingTotalPages}
               onPageChange={handleUpcomingPageChange}
             />
-          </div>
-          <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border-transparent">
-            <h2 className="text-lg font-semibold mb-4">Activity Feed</h2>
-            <p className="text-gray-500">Feature coming soon...</p>
           </div>
         </div>
       </div>

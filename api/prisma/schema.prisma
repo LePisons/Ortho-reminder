@@ -21,6 +21,11 @@ model Patient {
   email              String        @unique
   treatmentStartDate DateTime
   changeFrequency    Int
+  wearDaysPerAligner Int           @default(14)
+  totalAligners      Int           @default(0)
+  currentAligner     Int           @default(1)
+  batchPhase         Int           @default(1)
+  batchStartDate     DateTime?
   status             PatientStatus @default(ACTIVE)
   avatarUrl          String?
   diagnosis          String?
@@ -73,8 +78,8 @@ model Note {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  patientId String
-  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String?
+  patient   Patient?  @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 enum AppointmentStatus {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, StickyNote } from "lucide-react";
+import { Plus, Trash2, StickyNote, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -17,14 +17,13 @@ import {
 } from "@/components/ui/dialog";
 
 interface NotesPanelProps {
-  patientId: string;
+  patientId?: string;
 }
 
 const COLORS = [
-  { name: "yellow", value: "bg-yellow-100 border-yellow-200" },
-  { name: "blue", value: "bg-blue-100 border-blue-200" },
-  { name: "pink", value: "bg-pink-100 border-pink-200" },
-  { name: "green", value: "bg-green-100 border-green-200" },
+  { name: "green", value: "bg-emerald-50/70 border-emerald-100/80", flagColor: "text-emerald-500", label: "Low Priority" },
+  { name: "yellow", value: "bg-amber-50/70 border-amber-100/80", flagColor: "text-amber-500", label: "Medium Priority" },
+  { name: "red", value: "bg-rose-50/70 border-rose-100/80", flagColor: "text-rose-500", label: "High Priority" },
 ];
 
 export function NotesPanel({ patientId }: NotesPanelProps) {
@@ -36,7 +35,8 @@ export function NotesPanel({ patientId }: NotesPanelProps) {
 
   const fetchNotes = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/notes?patientId=${patientId}`, {
+      const url = patientId ? `${API_URL}/notes?patientId=${patientId}` : `${API_URL}/notes`;
+      const response = await fetch(url, {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch notes");
@@ -64,7 +64,7 @@ export function NotesPanel({ patientId }: NotesPanelProps) {
         body: JSON.stringify({
           content: newNoteContent,
           color: newNoteColor,
-          patientId,
+          ...(patientId ? { patientId } : {}),
         }),
         credentials: "include",
       });
@@ -99,7 +99,7 @@ export function NotesPanel({ patientId }: NotesPanelProps) {
   };
 
   return (
-    <div className="h-full flex flex-col border-l bg-gray-50/50 p-4 w-full">
+    <div className="h-full flex flex-col bg-white p-5 w-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-lg flex items-center gap-2">
           <StickyNote className="w-5 h-5 text-amber-500" />
@@ -120,20 +120,22 @@ export function NotesPanel({ patientId }: NotesPanelProps) {
             No notes yet. Add one!
           </p>
         ) : (
-          notes.map((note) => {
-            const colorClass =
-              COLORS.find((c) => c.name === note.color)?.value || COLORS[0].value;
-            return (
+          notes.map((note) => (
               <div
                 key={note.id}
-                className={`p-4 rounded-lg border shadow-sm relative group transition-all hover:shadow-md ${colorClass}`}
+                className={`p-4 rounded-xl border shadow-sm shadow-black/5 relative group transition-all hover:-translate-y-0.5 hover:shadow-md ${COLORS.find((c) => c.name === note.color)?.value || COLORS[0].value}`}
               >
-                <button
-                  onClick={() => handleDeleteNote(note.id)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 rounded-full text-gray-600"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-1">
+                    <Flag className={`w-3.5 h-3.5 fill-current ${COLORS.find((c) => c.name === note.color)?.flagColor || COLORS[0].flagColor}`} />
+                  </div>
+                  <button
+                    onClick={() => handleDeleteNote(note.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 rounded-full text-gray-600 -mt-1 -mr-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <p className="text-sm whitespace-pre-wrap leading-relaxed text-gray-800">
                   {note.content}
                 </p>
@@ -141,8 +143,7 @@ export function NotesPanel({ patientId }: NotesPanelProps) {
                   {format(new Date(note.createdAt), "MMM d, yyyy")}
                 </p>
               </div>
-            );
-          })
+          ))
         )}
       </div>
 
@@ -158,19 +159,20 @@ export function NotesPanel({ patientId }: NotesPanelProps) {
               placeholder="Type your note here..."
               className="resize-none h-32"
             />
-            <div className="flex gap-2">
+            <div className="flex gap-4">
               {COLORS.map((c) => (
                 <button
                   key={c.name}
                   onClick={() => setNewNoteColor(c.name)}
-                  className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
-                    c.value.split(" ")[0]
-                  } ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 transition-transform hover:scale-105 ${
                     newNoteColor === c.name
-                      ? "border-black ring-1 ring-offset-1 ring-black/20"
-                      : "border-transparent"
+                      ? "border-gray-800 bg-gray-50"
+                      : "border-transparent hover:bg-gray-50"
                   }`}
-                />
+                >
+                   <Flag className={`w-4 h-4 fill-current ${c.flagColor}`} />
+                   <span className="text-xs font-medium text-gray-700">{c.label}</span>
+                </button>
               ))}
             </div>
           </div>
