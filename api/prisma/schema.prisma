@@ -34,24 +34,26 @@ model Patient {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  userId             String
-  user               User          @relation(fields: [userId], references: [id])
-  messageLogs        MessageLog[]
-  clinicalRecords    ClinicalRecord[]
-  patientImages      PatientImage[]
-  notes              Note[]
-  appointments       Appointment[]
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  messageLogs     MessageLog[]
+  clinicalRecords ClinicalRecord[]
+  patientImages   PatientImage[]
+  notes           Note[]
+  appointments    Appointment[]
+  alignerBatches  AlignerBatch[]
+  reevaluations   Reevaluation[]
 }
 
 model ClinicalRecord {
-  id             String   @id @default(cuid())
-  date           DateTime @default(now())
-  diagnosis      String?
-  treatmentPlan  String?
-  observations   String?
-  
-  patientId      String
-  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  date          DateTime @default(now())
+  diagnosis     String?
+  treatmentPlan String?
+  observations  String?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 enum ImageType {
@@ -67,8 +69,8 @@ model PatientImage {
   description String?
   category    String?
 
-  patientId   String
-  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model Note {
@@ -79,7 +81,7 @@ model Note {
   updatedAt DateTime @updatedAt
 
   patientId String?
-  patient   Patient?  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 enum AppointmentStatus {
@@ -96,14 +98,14 @@ model Appointment {
   allDay      Boolean           @default(false)
   status      AppointmentStatus @default(SCHEDULED)
   description String?
-  
-  patientId   String?
-  patient     Patient?          @relation(fields: [patientId], references: [id])
 
-  todoistTaskId String?         @unique
+  patientId String?
+  patient   Patient? @relation(fields: [patientId], references: [id])
 
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  todoistTaskId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MessageLog {
@@ -111,18 +113,82 @@ model MessageLog {
   sentAt         DateTime @default(now())
   status         String
   messageContent String
-  
-  patientId      String
-  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   password  String
   name      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  patients  Patient[]
+}
+
+enum BatchStatus {
+  NEEDED
+  ORDER_SENT
+  IN_PRODUCTION
+  DELIVERED_TO_CLINIC
+  HANDED_TO_PATIENT
+  CANCELLED
+}
+
+model AlignerBatch {
+  id                   String      @id @default(cuid())
+  status               BatchStatus @default(NEEDED)
+  orderDate            DateTime?
+  expectedDeliveryDate DateTime?
+  actualDeliveryDate   DateTime?
+  notes                String?
+  batchNumber          Int         @default(1)
+  alignerCount         Int         @default(0)
+  technicianEmail      String?
+  technicianNotes      String?
+  createdBy            String?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  batchEvents BatchEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  patients  Patient[]
+}
 
+model BatchEvent {
+  id         String       @id @default(cuid())
+  batchId    String
+  batch      AlignerBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  fromStatus BatchStatus?
+  toStatus   BatchStatus
+  note       String?
+  createdBy  String?
+
+  createdAt DateTime @default(now())
+}
+
+enum ReevaluationStatus {
+  NEEDED
+  SCAN_UPLOADED
+  APPROVED
+}
+
+model Reevaluation {
+  id           String             @id @default(cuid())
+  status       ReevaluationStatus @default(NEEDED)
+  scanDate     DateTime?
+  scanFileUrl  String?
+  approvalDate DateTime?
+  notes        String?
+  createdBy    String?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

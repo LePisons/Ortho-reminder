@@ -20,6 +20,9 @@ export interface Patient {
   updatedAt: string;
   clinicalRecords?: ClinicalRecord[];
   patientImages?: PatientImage[];
+  pipelineStage?: 'ORDER_SENT' | 'IN_PRODUCTION' | 'READY_FOR_PICKUP' | 'REEVALUATION' | 'ENDING_SOON' | null;
+  alignerBatches?: AlignerBatch[];
+  reevaluations?: Reevaluation[];
 }
 
 export interface ClinicalRecord {
@@ -68,3 +71,55 @@ export interface Appointment {
     fullName: string;
   };
 }
+
+export type BatchStatus = 
+  | 'NEEDED'
+  | 'ORDER_SENT'
+  | 'IN_PRODUCTION'
+  | 'DELIVERED_TO_CLINIC'
+  | 'HANDED_TO_PATIENT'
+  | 'CANCELLED';
+
+export interface BatchEvent {
+  id: string;
+  batchId: string;
+  fromStatus?: BatchStatus;
+  toStatus: BatchStatus;
+  note?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface AlignerBatch {
+  id: string;
+  status: BatchStatus;
+  orderDate?: string;
+  expectedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  notes?: string;
+  batchNumber: number;
+  alignerCount: number;
+  technicianEmail?: string;
+  technicianNotes?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  patientId: string;
+  batchEvents?: BatchEvent[];
+}
+
+export type ReevaluationStatus = 'NEEDED' | 'SCAN_UPLOADED' | 'APPROVED';
+
+export interface Reevaluation {
+  id: string;
+  status: ReevaluationStatus;
+  scanDate?: string;
+  scanFileUrl?: string;
+  approvalDate?: string;
+  notes?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  patientId: string;
+}
+

@@ -21,6 +21,8 @@
     "prisma": "prisma"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.995.0",
+    "@aws-sdk/s3-request-presigner": "^3.995.0",
     "@doist/todoist-api-typescript": "^6.5.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",

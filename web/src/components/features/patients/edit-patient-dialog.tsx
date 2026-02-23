@@ -31,6 +31,7 @@ import {
 
 import { useForm } from "react-hook-form";
 import type { Patient } from "@/lib/types";
+import { formatRut } from "@/lib/format-rut";
 
 // 1. Define the props this component will accept
 interface EditPatientDialogProps {
@@ -70,6 +71,32 @@ export function EditPatientDialog({
     values.wearDaysPerAligner = values.changeFrequency;
     
     try {
+      // 3a. Pre-flight Duplication Check
+      const checkRes = await fetch(`${API_URL}/patients/check-duplicates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rut: values.rut,
+          email: values.email,
+          phone: values.phone,
+          excludePatientId: patient.id,
+        }),
+        credentials: "include",
+      });
+
+      if (checkRes.ok) {
+        const { exists, conflicts } = await checkRes.json();
+        if (exists && conflicts.length > 0) {
+          const proceed = window.confirm(
+            `Another patient with this ${conflicts.join(" and ")} is already registered.\n\nDo you want to proceed and save a duplicate record anyway?`
+          );
+          if (!proceed) {
+            return; // Abort update
+          }
+        }
+      }
+
+      // 3b. Proceed with Update
       const response = await fetch(
         `${API_URL}/patients/${patient.id}`,
         {
@@ -127,7 +154,13 @@ export function EditPatientDialog({
                 <FormItem>
                   <FormLabel>RUT</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input 
+                      {...field} 
+                      onBlur={(e) => {
+                        field.onBlur();
+                        field.onChange(formatRut(e.target.value));
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

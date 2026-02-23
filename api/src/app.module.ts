@@ -14,6 +14,8 @@ import { PatientImagesModule } from './patient-images/patient-images.module';
 import { NotesModule } from './notes/notes.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { TodoistModule } from './integrations/todoist/todoist.module';
+import { AlignerBatchesModule } from './aligner-batches/aligner-batches.module';
+import { ReevaluationsModule } from './reevaluations/reevaluations.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { TodoistModule } from './integrations/todoist/todoist.module';
     NotesModule,
     AppointmentsModule,
     TodoistModule,
+    AlignerBatchesModule,
+    ReevaluationsModule,
   ],
   controllers: [],
   providers: [ReminderService, TwilioService],

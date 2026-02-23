@@ -39,6 +39,15 @@ export class PatientsController {
     return this.patientsService.create(createPatientDto, req.user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('check-duplicates')
+  checkDuplicates(
+    @Body() body: { rut?: string; email?: string; phone?: string; excludePatientId?: string },
+    @Request() req
+  ) {
+    return this.patientsService.checkDuplicates(body.rut, body.email, body.phone, req.user.userId, body.excludePatientId);
+  }
+
   @Post(':id/avatar')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -86,6 +95,11 @@ export class PatientsController {
     @Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number,
   ) {
     return this.patientsService.findUpcomingChanges(page, limit);
+  }
+
+  @Get('pipeline')
+  getPipeline() {
+    return this.patientsService.getPipeline();
   }
 
   @Get(':id')

@@ -30,6 +30,20 @@ export class PatientsService {
           createPatientDto.treatmentStartDate + 'T00:00:00',
         ),
         batchStartDate: batchStartDateObj,
+        alignerBatches: (createPatientDto.totalAligners || 0) > 0 ? {
+          create: [{
+            status: 'NEEDED',
+            alignerCount: createPatientDto.totalAligners,
+            createdBy: userId,
+            batchEvents: {
+              create: [{
+                toStatus: 'NEEDED',
+                note: 'Initial batch created automatically',
+                createdBy: userId,
+              }]
+            }
+          }]
+        } : undefined,
       },
     });
 
@@ -52,6 +66,45 @@ export class PatientsService {
     return this.mapPatientWithUrgency(newPatient);
   }
 
+  async checkDuplicates(rut?: string, email?: string, phone?: string, userId?: string, excludePatientId?: string) {
+    if (!userId) return { exists: false, conflicts: [] };
+    
+    // Build the OR conditions based on provided fields
+    const orConditions: any[] = [];
+    if (rut) orConditions.push({ rut });
+    if (email) orConditions.push({ email });
+    if (phone) orConditions.push({ phone });
+
+    // If no fields to check, return false
+    if (orConditions.length === 0) return { exists: false, conflicts: [] };
+
+    const whereClause: any = {
+      userId,
+      OR: orConditions
+    };
+
+    // If we are editing, we don't want to flag the patient themselves as a duplicate
+    if (excludePatientId) {
+      whereClause.id = { not: excludePatientId };
+    }
+
+    const existingPatient = await this.prisma.patient.findFirst({
+      where: whereClause
+    });
+
+    if (!existingPatient) {
+      return { exists: false, conflicts: [] };
+    }
+
+    // Determine which exact fields conflicted to tell the user
+    const conflicts: string[] = [];
+    if (rut && existingPatient.rut === rut) conflicts.push('RUT');
+    if (email && existingPatient.email === email) conflicts.push('Email');
+    if (phone && existingPatient.phone === phone) conflicts.push('Phone');
+
+    return { exists: true, conflicts };
+  }
+
   // The method now needs to accept page and limit, with defaults
   async findAll(page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit; // Calculate how many records to skip
@@ -62,6 +115,18 @@ export class PatientsService {
         skip: skip,
         take: limit,
         orderBy: { createdAt: 'desc' }, // Always good to have a consistent order
+        include: {
+          alignerBatches: {
+            where: { status: { notIn: ['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'] } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+          reevaluations: {
+            where: { status: { in: ['NEEDED', 'SCAN_UPLOADED'] } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          }
+        }
       }),
       this.prisma.patient.count(),
     ]);
@@ -81,6 +146,16 @@ export class PatientsService {
       include: {
         clinicalRecords: true,
         patientImages: true,
+        alignerBatches: {
+          where: { status: { notIn: ['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+        reevaluations: {
+          where: { status: { in: ['NEEDED', 'SCAN_UPLOADED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        }
       },
     });
     return patient ? this.mapPatientWithUrgency(patient) : null;
@@ -135,9 +210,58 @@ export class PatientsService {
     return { total, active, paused, finished };
   }
 
+  async getPipeline() {
+    const activePatients = await this.prisma.patient.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        alignerBatches: {
+          where: { status: { notIn: ['HANDED_TO_PATIENT', 'CANCELLED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+        reevaluations: {
+          where: { status: { in: ['NEEDED', 'SCAN_UPLOADED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        }
+      }
+    });
+
+    const mappedPatients = activePatients.map(p => this.mapPatientWithUrgency(p));
+    
+    // Group patients by pipelineStage
+    const pipeline = {
+      ENDING_SOON: [] as any[],
+      ORDER_SENT: [] as any[],
+      IN_PRODUCTION: [] as any[],
+      READY_FOR_PICKUP: [] as any[],
+      REEVALUATION: [] as any[],
+    };
+
+    mappedPatients.forEach(patient => {
+      if (patient.pipelineStage && pipeline[patient.pipelineStage as keyof typeof pipeline]) {
+        pipeline[patient.pipelineStage as keyof typeof pipeline].push(patient);
+      }
+    });
+
+    return pipeline;
+  }
+
   async findUpcomingChanges(page: number = 1, limit: number = 5) {
     const activePatients = await this.prisma.patient.findMany({
       where: { status: 'ACTIVE' },
+      include: {
+        alignerBatches: {
+          where: { status: { notIn: ['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+        reevaluations: {
+          where: { status: { in: ['NEEDED', 'SCAN_UPLOADED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        }
+      }
     });
 
     const today = new Date();
@@ -218,9 +342,33 @@ export class PatientsService {
        urgencyStatus = 'ON_TRACK'; 
     }
 
+    let pipelineStage: string | null = null;
+    const activeBatch = patient.alignerBatches?.[0];
+    const activeReeval = patient.reevaluations?.[0];
+
+    // Priority 1: Active Re-evaluation
+    if (activeReeval) {
+      pipelineStage = 'REEVALUATION';
+    } 
+    // Priority 2: Active Batch in Pipeline
+    else if (activeBatch) {
+      if (activeBatch.status === 'ORDER_SENT') {
+        pipelineStage = 'ORDER_SENT';
+      } else if (activeBatch.status === 'IN_PRODUCTION') {
+        pipelineStage = 'IN_PRODUCTION';
+      } else if (activeBatch.status === 'DELIVERED_TO_CLINIC') {
+        pipelineStage = 'READY_FOR_PICKUP';
+      }
+    } 
+    // Priority 3: Ending Soon (derived from Urgency)
+    else if (urgencyStatus === 'ENDING_SOON' || urgencyStatus === 'OVERDUE') {
+      pipelineStage = 'ENDING_SOON';
+    }
+
     return {
       ...patient,
       urgencyStatus,
+      pipelineStage,
     };
   }
 }

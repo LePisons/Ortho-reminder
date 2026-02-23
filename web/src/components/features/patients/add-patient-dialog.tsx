@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/form"; // Shadcn's Form components
 
 import { useState } from "react";
+import { formatRut } from "@/lib/format-rut";
 
 // defines the props interface
 
@@ -64,6 +65,31 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
     // Sync wearDaysPerAligner with changeFrequency since they represent the same thing
     values.wearDaysPerAligner = values.changeFrequency;
     try {
+      // 2a. Pre-flight Duplication Check
+      const checkRes = await fetch(`${API_URL}/patients/check-duplicates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rut: values.rut,
+          email: values.email,
+          phone: values.phone,
+        }),
+        credentials: "include",
+      });
+
+      if (checkRes.ok) {
+        const { exists, conflicts } = await checkRes.json();
+        if (exists && conflicts.length > 0) {
+          const proceed = window.confirm(
+            `A patient with this ${conflicts.join(" and ")} is already registered.\n\nDo you want to proceed and create a duplicate record anyway?`
+          );
+          if (!proceed) {
+            return; // Abort creation
+          }
+        }
+      }
+
+      // 2b. Proceed with Creation
       const response = await fetch(`${API_URL}/patients`, {
         method: "POST",
         headers: {
@@ -129,7 +155,14 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
                 <FormItem>
                   <FormLabel>RUT</FormLabel>
                   <FormControl>
-                    <Input placeholder="11111111-1" {...field} />
+                    <Input 
+                      placeholder="11.111.111-1" 
+                      {...field} 
+                      onBlur={(e) => {
+                        field.onBlur(); // keep react-hook-form's blur
+                        field.onChange(formatRut(e.target.value));
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

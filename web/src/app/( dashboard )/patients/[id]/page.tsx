@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { API_URL } from "@/lib/utils";
-import { Patient } from "@/lib/types";
+import { Patient, AlignerBatch } from "@/lib/types";
 import { PatientInfoCard } from "@/components/features/patients/patient-info-card";
 import { PatientSummaryCard } from "@/components/features/patients/patient-summary-card";
 import { AlignerProgress } from "@/components/features/patients/aligner-progress";
@@ -12,6 +12,8 @@ import { ImagesTab } from "@/components/features/clinical/images-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
 import { toast } from "sonner";
 import { NotesPanel } from "@/components/features/dashboard/notes-panel";
+import { BatchLifecycleTracker } from "@/components/features/patients/batch-lifecycle-tracker";
+import { ReevaluationTracker } from "@/components/features/patients/reevaluation-tracker";
 
 export default function PatientDetailsPage() {
   const params = useParams();
@@ -41,6 +43,90 @@ export default function PatientDetailsPage() {
     }
   }, [id, fetchPatient]);
 
+  const handleStatusChange = async (batchId: string, action: string, payload?: unknown) => {
+    try {
+      const response = await fetch(`${API_URL}/aligner-batches/${batchId}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload ? JSON.stringify(payload) : undefined,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.message || "Failed to transition batch status");
+      }
+      toast.success("Batch status updated");
+      fetchPatient(); // Reload patient data including their batches
+    } catch (error: Error | unknown) {
+      console.error(error);
+      toast.error((error as Error).message);
+    }
+  };
+
+  const handleCreateBatch = async () => {
+    try {
+      const response = await fetch(`${API_URL}/aligner-batches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId: id, alignerCount: patient?.totalAligners || 0 }),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to create batch");
+      toast.success("New batch started");
+      fetchPatient();
+    } catch (error: Error | unknown) {
+      console.error(error);
+      toast.error((error as Error).message);
+    }
+  };
+
+  const handleReevalStatusChange = async (reevalId: string, action: string, payload?: unknown) => {
+    try {
+      const url = action === 'approve' 
+        ? `${API_URL}/reevaluations/${reevalId}/approve`
+        : `${API_URL}/reevaluations/${reevalId}/${action}`;
+
+      const response = await fetch(url, {
+        method: action === 'approve' ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: payload ? JSON.stringify(payload) : undefined,
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to update re-evaluation");
+      toast.success("Re-evaluation updated");
+      fetchPatient();
+    } catch (error: Error | unknown) {
+      console.error(error);
+      toast.error((error as Error).message);
+    }
+  };
+
+  const handleCreateReeval = async () => {
+    try {
+      const response = await fetch(`${API_URL}/reevaluations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId: id }),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to request re-evaluation");
+      toast.success("Re-evaluation requested");
+      fetchPatient();
+    } catch (error: Error | unknown) {
+      console.error(error);
+      toast.error((error as Error).message);
+    }
+  };
+
+  const getUploadUrl = async (reevalId: string) => {
+    const response = await fetch(`${API_URL}/reevaluations/${reevalId}/upload-url`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Failed to secure presigned upload url");
+    return response.json();
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-full">Loading...</div>;
   }
@@ -63,8 +149,9 @@ export default function PatientDetailsPage() {
           <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
 
           <Tabs defaultValue="clinical" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="clinical">Clinical History</TabsTrigger>
+              <TabsTrigger value="batch">Lab Pipeline</TabsTrigger>
               <TabsTrigger value="photos">Photos</TabsTrigger>
               <TabsTrigger value="xrays">X-Rays</TabsTrigger>
             </TabsList>
@@ -74,6 +161,31 @@ export default function PatientDetailsPage() {
                 records={patient.clinicalRecords || []}
                 onUpdate={fetchPatient}
               />
+            </TabsContent>
+            <TabsContent value="batch" className="space-y-6 mt-6">
+              <BatchLifecycleTracker 
+                patientId={patient.id}
+                batch={(patient.alignerBatches || []).find((b: AlignerBatch) => !['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'].includes(b.status))}
+                onStatusChange={handleStatusChange}
+                onCreateBatch={handleCreateBatch}
+              />
+              {patient.reevaluations && patient.reevaluations.length > 0 && (
+                <ReevaluationTracker
+                  patientId={patient.id}
+                  reevaluation={patient.reevaluations[0]} // most recent
+                  onStatusChange={handleReevalStatusChange}
+                  onCreateReevaluation={handleCreateReeval}
+                  generateUploadUrl={getUploadUrl}
+                />
+              )}
+              {(!patient.reevaluations || patient.reevaluations.length === 0) && patient.alignerBatches && patient.alignerBatches.some(b => b.status === 'HANDED_TO_PATIENT') && (
+                 <ReevaluationTracker
+                   patientId={patient.id}
+                   onStatusChange={handleReevalStatusChange}
+                   onCreateReevaluation={handleCreateReeval}
+                   generateUploadUrl={getUploadUrl}
+                 />
+              )}
             </TabsContent>
             <TabsContent value="photos">
               <ImagesTab
