@@ -16,6 +16,8 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { TodoistModule } from './integrations/todoist/todoist.module';
 import { AlignerBatchesModule } from './aligner-batches/aligner-batches.module';
 import { ReevaluationsModule } from './reevaluations/reevaluations.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { ReevaluationsModule } from './reevaluations/reevaluations.module';
     TodoistModule,
     AlignerBatchesModule,
     ReevaluationsModule,
+    MessagingModule,
+    OnboardingModule,
   ],
   controllers: [],
   providers: [ReminderService, TwilioService],

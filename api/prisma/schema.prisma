@@ -33,16 +33,21 @@ model Patient {
   observations       String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  whatsappOptedIn    Boolean       @default(false)
+  whatsappOptedInAt  DateTime?
 
-  userId          String
-  user            User             @relation(fields: [userId], references: [id])
-  messageLogs     MessageLog[]
-  clinicalRecords ClinicalRecord[]
-  patientImages   PatientImage[]
-  notes           Note[]
-  appointments    Appointment[]
-  alignerBatches  AlignerBatch[]
-  reevaluations   Reevaluation[]
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  messageLogs         MessageLog[]
+  clinicalRecords     ClinicalRecord[]
+  patientImages       PatientImage[]
+  notes               Note[]
+  appointments        Appointment[]
+  alignerBatches      AlignerBatch[]
+  reevaluations       Reevaluation[]
+  alignerChangeEvents AlignerChangeEvent[]
+  appointmentRecords  AppointmentRecord[]
+  onboardingToken     OnboardingToken?
 }
 
 model ClinicalRecord {
@@ -108,15 +113,7 @@ model Appointment {
   updatedAt DateTime @updatedAt
 }
 
-model MessageLog {
-  id             String   @id @default(cuid())
-  sentAt         DateTime @default(now())
-  status         String
-  messageContent String
-
-  patientId String
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-}
+// MessageLog replaced by the new version at the bottom
 
 model User {
   id        String    @id @default(cuid())
@@ -191,4 +188,101 @@ model Reevaluation {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum MessageChannel {
+  WHATSAPP
+  EMAIL
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum MessageTemplateType {
+  ALIGNER_CHANGE_REMINDER
+  APPOINTMENT_REMINDER_48H
+  APPOINTMENT_REMINDER_2H
+  BATCH_PICKUP_READY
+  LAB_ORDER_REQUEST
+  PROGRESS_MILESTONE_50
+  MISSED_APPOINTMENT
+  ORTHODONTIST_ALERT_BATCH_URGENT
+  ORTHODONTIST_ALERT_WEEKLY_SUMMARY
+  ORTHODONTIST_ALERT_OVERDUE_DELIVERY
+  TREATMENT_COMPLETED
+  WELCOME
+  CHANGE_CONFIRMATION
+  CHANGE_FOLLOWUP_NO
+  FALLBACK_UNRECOGNIZED
+}
+
+model MessageTemplate {
+  id        String              @id @default(cuid())
+  name      String              @unique
+  type      MessageTemplateType
+  channel   MessageChannel
+  content   String
+  language  String              @default("es")
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  logs      MessageLog[]
+}
+
+model MessageLog {
+  id           String           @id @default(cuid())
+  patientId    String?
+  templateId   String?
+  template     MessageTemplate? @relation(fields: [templateId], references: [id])
+  channel      MessageChannel
+  recipient    String
+  content      String
+  status       MessageStatus    @default(PENDING)
+  errorMessage String?
+  triggeredBy  String           // "cron" | "manual" | "telegram_bot"
+  createdAt    DateTime         @default(now())
+
+  patient      Patient?         @relation(fields: [patientId], references: [id])
+}
+
+model AlignerChangeEvent {
+  id             String   @id @default(cuid())
+  patientId      String
+  patient        Patient  @relation(fields: [patientId], references: [id])
+  alignerNumber  Int
+  confirmedAt    DateTime?
+  confirmedBy    String?   // "bot_reply" | "manual" | "auto"
+  nextReminderAt DateTime
+  createdAt      DateTime @default(now())
+}
+
+model AppointmentRecord {
+  id               String    @id @default(cuid())
+  patientId        String
+  patient          Patient   @relation(fields: [patientId], references: [id])
+  appointmentDate  DateTime
+  alignersGiven    Int
+  startingAligner  Int
+  nextApptEstimate DateTime?
+  createdAt        DateTime  @default(now())
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model OnboardingToken {
+  id          String    @id @default(cuid())
+  patientId   String    @unique
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  token       String    @unique @default(cuid())
+  usedAt      DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
 }
