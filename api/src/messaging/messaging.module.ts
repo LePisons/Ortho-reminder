@@ -7,9 +7,11 @@ import { MessageTemplateService } from './message-template.service';
 import { NotificationDispatcherService } from './notification-dispatcher.service';
 import { TriggerEvaluatorService } from './trigger-evaluator.service';
 import { CronService } from './cron.service';
+import { WhatsAppWebhookController } from './whatsapp.controller';
 
 @Module({
   imports: [PrismaModule, ScheduleModule.forRoot()],
+  controllers: [WhatsAppWebhookController],
   providers: [
     EmailProvider,
     WhatsAppProvider,

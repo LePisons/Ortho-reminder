@@ -23,7 +23,8 @@ model Patient {
   changeFrequency    Int
   wearDaysPerAligner Int           @default(14)
   totalAligners      Int           @default(0)
-  currentAligner     Int           @default(1)
+  currentAligner     Int           @default(0) // 0 implies tracking hasn't started
+  trackingStartedAt  DateTime?
   batchPhase         Int           @default(1)
   batchStartDate     DateTime?
   status             PatientStatus @default(ACTIVE)
@@ -143,6 +144,7 @@ model AlignerBatch {
   notes                String?
   batchNumber          Int         @default(1)
   alignerCount         Int         @default(0)
+  gooFileUrl           String?
   technicianEmail      String?
   technicianNotes      String?
   createdBy            String?
@@ -199,6 +201,7 @@ enum MessageStatus {
   PENDING
   SENT
   DELIVERED
+  READ
   FAILED
 }
 
@@ -241,18 +244,19 @@ model MessageLog {
   channel      MessageChannel
   recipient    String
   content      String
-  status       MessageStatus    @default(PENDING)
-  errorMessage String?
+  status            MessageStatus    @default(PENDING)
+  error             String?
+  providerMessageId String?          @unique
   triggeredBy  String           // "cron" | "manual" | "telegram_bot"
   createdAt    DateTime         @default(now())
 
-  patient      Patient?         @relation(fields: [patientId], references: [id])
+  patient      Patient?         @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model AlignerChangeEvent {
   id             String   @id @default(cuid())
   patientId      String
-  patient        Patient  @relation(fields: [patientId], references: [id])
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   alignerNumber  Int
   confirmedAt    DateTime?
   confirmedBy    String?   // "bot_reply" | "manual" | "auto"
@@ -263,7 +267,7 @@ model AlignerChangeEvent {
 model AppointmentRecord {
   id               String    @id @default(cuid())
   patientId        String
-  patient          Patient   @relation(fields: [patientId], references: [id])
+  patient          Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
   appointmentDate  DateTime
   alignersGiven    Int
   startingAligner  Int
@@ -280,7 +284,7 @@ model Setting {
 model OnboardingToken {
   id          String    @id @default(cuid())
   patientId   String    @unique
-  patient     Patient   @relation(fields: [patientId], references: [id])
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
   token       String    @unique @default(cuid())
   usedAt      DateTime?
   expiresAt   DateTime

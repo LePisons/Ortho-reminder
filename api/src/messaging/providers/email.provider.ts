@@ -14,7 +14,7 @@ export class EmailProvider implements IMessagingProvider {
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    this.resend = new Resend(apiKey);
+    this.resend = new Resend(apiKey || 're_dummy_key_do_not_use');
     this.fromEmail =
       this.configService.get<string>('EMAIL_FROM') ||
       'Alnix | Dr. Pison <noreply@alnix.cl>';

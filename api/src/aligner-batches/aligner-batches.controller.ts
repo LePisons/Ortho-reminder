@@ -57,6 +57,21 @@ export class AlignerBatchesController {
     );
   }
 
+  @Post(':id/generate-upload-url')
+  generateUploadUrl(@Param('id') id: string, @Request() req) {
+    return this.batchesService.generateUploadUrl(id, req.user.userId);
+  }
+
+  @Post(':id/confirm-upload')
+  confirmFilesUploaded(
+    @Param('id') id: string,
+    @Body('fileUrl') fileUrl: string,
+    @Body('key') key: string,
+    @Request() req,
+  ) {
+    return this.batchesService.confirmFilesUploaded(id, fileUrl, key, req.user.userId);
+  }
+
   @Post(':id/mark-in-production')
   markInProduction(@Param('id') id: string, @Request() req) {
     return this.batchesService.markInProduction(id, req.user.userId);

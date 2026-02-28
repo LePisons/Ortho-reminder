@@ -4,12 +4,19 @@ import { Patient } from "@/lib/types";
 import { format, addDays } from "date-fns";
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { API_URL } from "@/lib/utils";
+import { toast } from "sonner";
+import { useState } from "react";
+
 interface AlignerProgressProps {
   patient: Patient;
+  onUpdate: () => void;
 }
 
-export function AlignerProgress({ patient }: AlignerProgressProps) {
-  const { totalAligners = 0, currentAligner = 1, wearDaysPerAligner = 14, urgencyStatus } = patient;
+export function AlignerProgress({ patient, onUpdate }: AlignerProgressProps) {
+  const { totalAligners = 0, currentAligner = 1, wearDaysPerAligner = 14, urgencyStatus, trackingStartedAt } = patient;
+  const [isStarting, setIsStarting] = useState(false);
 
   if (totalAligners === 0) {
     return (
@@ -18,6 +25,48 @@ export function AlignerProgress({ patient }: AlignerProgressProps) {
           <AlertCircle className="w-6 h-6" />
           Treatment plan not configured
         </div>
+      </div>
+    );
+  }
+
+  const handleStartTracking = async () => {
+    setIsStarting(true);
+    try {
+      const response = await fetch(`${API_URL}/patients/${patient.id}/start-tracking`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to start tracking");
+      
+      toast.success("Treatment tracking officially started!");
+      onUpdate();
+    } catch (e) {
+      toast.error("Failed to start tracking");
+      console.error(e);
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  if (!trackingStartedAt) {
+    return (
+      <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-8 flex flex-col items-center justify-center text-center space-y-4">
+        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-2">
+          <Calendar className="w-8 h-8 text-blue-500" />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Tracking Not Started</h3>
+          <p className="text-gray-500 max-w-sm mx-auto mb-6 text-sm">
+            Tracking begins automatically when the patient scans their QR code. You can also start it manually right now.
+          </p>
+        </div>
+        <Button 
+          onClick={handleStartTracking} 
+          disabled={isStarting}
+          className="bg-blue-600 hover:bg-blue-700 font-semibold px-8"
+        >
+          {isStarting ? "Starting..." : "Start Tracking Manually"}
+        </Button>
       </div>
     );
   }

@@ -18,12 +18,12 @@ export class ReminderService {
 
   // This CRON job will run every day at 9 AM.
 
-  @Cron(CronExpression.EVERY_30_SECONDS, {
-    name: 'aligner_reminders',
-    timeZone: 'America/Santiago',
-  })
+  // @Cron(CronExpression.EVERY_30_SECONDS, {
+  //   name: 'aligner_reminders',
+  //   timeZone: 'America/Santiago',
+  // })
   async handleCron() {
-    this.logger.log('Running daily aligner reminder check...');
+    // this.logger.log('Running daily aligner reminder check...');
 
     const activePatients = await this.prisma.patient.findMany({
       where: { status: 'ACTIVE' },
@@ -50,7 +50,7 @@ export class ReminderService {
         const alreadySent = await this.prisma.messageLog.findFirst({
           where: {
             patientId: patient.id,
-            messageContent: logContent, // We use it here for the check
+            content: logContent, // We use it here for the check
           },
         });
 
@@ -76,7 +76,10 @@ export class ReminderService {
             data: {
               patientId: patient.id,
               status: 'SENT',
-              messageContent: logContent, // We use it here for the log
+              content: logContent, // We use it here for the log
+              channel: 'WHATSAPP',
+              recipient: patient.phone,
+              triggeredBy: 'cron',
             },
           });
         } catch (error) {

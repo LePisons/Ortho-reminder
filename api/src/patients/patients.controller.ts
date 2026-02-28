@@ -114,6 +114,12 @@ export class PatientsController {
     return this.patientsService.update(id, updatePatientDto);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/start-tracking')
+  startTracking(@Param('id') id: string, @Request() req) {
+    return this.patientsService.startTracking(id, req.user.userId);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     // REMOVE THE '+' SIGN HERE

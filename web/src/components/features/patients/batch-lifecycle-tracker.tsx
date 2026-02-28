@@ -1,34 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AlignerBatch, BatchStatus } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Clock, Send, Box, UserCheck, XCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Box, UserCheck, XCircle, AlertCircle, Upload } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface BatchLifecycleTrackerProps {
   batch?: AlignerBatch;
   patientId: string;
   onStatusChange: (batchId: string, action: string, payload?: unknown) => Promise<void>;
   onCreateBatch: () => Promise<void>;
+  generateUploadUrl?: (batchId: string) => Promise<{ uploadUrl: string; key: string }>;
 }
 
 const STAGES: { status: BatchStatus; label: string; icon: React.ElementType }[] = [
-  { status: 'NEEDED', label: 'Needed', icon: AlertCircle },
-  { status: 'ORDER_SENT', label: 'Order Sent', icon: Send },
+  { status: 'NEEDED', label: 'Required Files', icon: AlertCircle },
   { status: 'IN_PRODUCTION', label: 'In Production', icon: Clock },
-  { status: 'DELIVERED_TO_CLINIC', label: 'At Clinic', icon: Box },
-  { status: 'HANDED_TO_PATIENT', label: 'With Patient', icon: UserCheck },
+  { status: 'DELIVERED_TO_CLINIC', label: 'Ready for Pickup', icon: Box },
+  { status: 'HANDED_TO_PATIENT', label: 'In Treatment', icon: UserCheck },
 ];
 
 export function BatchLifecycleTracker({
   batch,
   onStatusChange,
   onCreateBatch,
+  generateUploadUrl
 }: BatchLifecycleTrackerProps) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAction = async (action: string, payload?: unknown) => {
     setLoadingAction(action);
@@ -40,6 +43,48 @@ export function BatchLifecycleTracker({
       }
     } finally {
       setLoadingAction(null);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !batch || !generateUploadUrl) return;
+
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      toast.error('Only .zip files are allowed for .goo prints');
+      return;
+    }
+
+    setLoadingAction('upload');
+    const toastId = toast.loading('Preparing upload...');
+    
+    try {
+      const { uploadUrl, key } = await generateUploadUrl(batch.id);
+      
+      toast.loading('Uploading print files securely...', { id: toastId });
+
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': 'application/zip',
+        },
+      });
+
+      if (!uploadRes.ok) throw new Error('Failed to upload file to storage provider');
+
+      toast.loading('Confirming upload...', { id: toastId });
+      const publicUrl = `https://storage.orthoreminder.com/${key}`;
+
+      await onStatusChange(batch.id, 'confirm-upload', { fileUrl: publicUrl, key });
+      
+      toast.success('Files uploaded successfully! Lab order sent.', { id: toastId });
+    } catch (error: Error | unknown) {
+      console.error('Upload Error:', error);
+      toast.error((error as Error).message || 'Error occurred during upload', { id: toastId });
+    } finally {
+      setLoadingAction(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -116,15 +161,25 @@ export function BatchLifecycleTracker({
         {!isCancelled && (
           <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2 justify-end">
             {batch.status === 'NEEDED' && (
-              <Button 
-                size="sm" 
-                onClick={() => handleAction('send-order', {
-                   expectedDeliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-                })}
-                disabled={loadingAction === 'send-order' || batch.alignerCount <= 0}
-              >
-                Mark Order Sent
-              </Button>
+               <div className="flex gap-2">
+                <input 
+                  type="file" 
+                  accept=".zip" 
+                  className="hidden" 
+                  ref={fileInputRef} 
+                  onChange={handleFileUpload}
+                  disabled={loadingAction === 'upload'}
+                />
+                <Button 
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={loadingAction === 'upload' || batch.alignerCount <= 0}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Print Files (.zip)
+                </Button>
+               </div>
             )}
             
             {batch.status === 'ORDER_SENT' && (

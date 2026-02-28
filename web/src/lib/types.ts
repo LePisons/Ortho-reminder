@@ -14,15 +14,23 @@ export interface Patient {
   currentAligner?: number;
   wearDaysPerAligner?: number;
   batchStartDate?: string;
+  trackingStartedAt?: string | null;
   urgencyStatus?: 'ON_TRACK' | 'ENDING_SOON' | 'OVERDUE' | 'AWAITING_REEVALUATION';
   observations?: string;
   createdAt: string;
   updatedAt: string;
   clinicalRecords?: ClinicalRecord[];
   patientImages?: PatientImage[];
-  pipelineStage?: 'ORDER_SENT' | 'IN_PRODUCTION' | 'READY_FOR_PICKUP' | 'REEVALUATION' | 'ENDING_SOON' | null;
+  pipelineStage?: 'REQUIRED_FILES' | 'IN_PRODUCTION' | 'READY_FOR_PICKUP' | 'IN_TREATMENT' | 'REEVALUATION' | 'ENDING_SOON' | null;
   alignerBatches?: AlignerBatch[];
   reevaluations?: Reevaluation[];
+  whatsappOptedIn?: boolean;
+  whatsappOptedInAt?: string | null;
+  onboardingToken?: {
+    token: string;
+    expiresAt: string;
+    usedAt: string | null;
+  } | null;
 }
 
 export interface ClinicalRecord {
@@ -99,6 +107,7 @@ export interface AlignerBatch {
   notes?: string;
   batchNumber: number;
   alignerCount: number;
+  gooFileUrl?: string | null;
   technicianEmail?: string;
   technicianNotes?: string;
   createdBy?: string;

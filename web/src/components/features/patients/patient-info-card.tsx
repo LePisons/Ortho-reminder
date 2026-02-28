@@ -7,6 +7,7 @@ import { Patient } from "@/lib/types";
 import { Calendar, Mail, Phone, User, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { API_URL } from "@/lib/utils";
+import { QRCodeSVG } from 'qrcode.react';
 
 interface PatientInfoCardProps {
   patient: Patient;
@@ -105,10 +106,10 @@ export function PatientInfoCard({ patient, onUpdate }: PatientInfoCardProps) {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-center">
               <div className="flex items-center justify-center md:justify-start gap-2 text-sm">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{patient.email}</span>
+                <span className="truncate max-w-[150px]" title={patient.email}>{patient.email}</span>
               </div>
               <div className="flex items-center justify-center md:justify-start gap-2 text-sm">
                 <Phone className="h-4 w-4 text-muted-foreground" />
@@ -116,9 +117,42 @@ export function PatientInfoCard({ patient, onUpdate }: PatientInfoCardProps) {
               </div>
               <div className="flex items-center justify-center md:justify-start gap-2 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>
+                <span className="whitespace-nowrap">
                   Started: {new Date(patient.treatmentStartDate).toLocaleDateString()}
                 </span>
+              </div>
+              
+              {/* WhatsApp Opt-in Status / QR */}
+              <div className="flex justify-center md:justify-end lg:col-start-4">
+                {patient.whatsappOptedIn ? (
+                  <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50 gap-1.5 py-1.5">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    WhatsApp Opted-In
+                  </Badge>
+                ) : patient.onboardingToken ? (
+                  <div className="flex items-center gap-3 bg-slate-50 border rounded-lg p-2 hover:bg-slate-100 transition-colors cursor-pointer group" onClick={() => {
+                    const url = `${window.location.origin}/onboarding/${patient.onboardingToken?.token}`;
+                    navigator.clipboard.writeText(url);
+                    toast.success("Enlace de vinculación copiado al portapapeles");
+                  }}>
+                    <div className="bg-white p-1 rounded shadow-sm border group-hover:border-primary/50 transition-colors">
+                      <QRCodeSVG 
+                        value={`${window.location.origin}/onboarding/${patient.onboardingToken.token}`} 
+                        size={40} 
+                        level="L"
+                        includeMargin={false}
+                      />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-semibold text-slate-700 leading-tight">Vincular<br/>WhatsApp</p>
+                      <p className="text-[10px] text-muted-foreground">Click p/ copiar URL</p>
+                    </div>
+                  </div>
+                ) : (
+                  <Badge variant="secondary" className="bg-slate-100 text-slate-500">
+                    No onboarding token
+                  </Badge>
+                )}
               </div>
             </div>
           </div>

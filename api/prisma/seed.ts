@@ -46,7 +46,7 @@ async function main() {
       name: 'Pedido a Laboratorio',
       type: MessageTemplateType.LAB_ORDER_REQUEST,
       channel: MessageChannel.EMAIL,
-      content: '<h1>Solicitud de Alineadores - Alnix</h1><p>Estimado laboratorio,</p><p>Favor fabricar la siguiente etapa para el paciente <strong>{{patient_rut}}</strong>.</p><p>Cantidad solicitada: {{aligner_count}} pares.</p><p>Notas clínicas: {{clinical_notes}}</p>',
+      content: '<h1>Solicitud de Alineadores - {{clinic_name}}</h1><p>Estimado laboratorio,</p><p>Favor fabricar la etapa <strong>#{{batch_number}}</strong>.</p><p><strong>Orden #:</strong> {{order_number}}</p><p><strong>Paciente:</strong> {{patient_name}}</p><p>Cantidad solicitada: <strong>{{aligner_count}}</strong> pares.</p><p>Notas clínicas: {{notes}}</p><br><p><a href="{{file_download_link}}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Descargar Archivos de Impresión (.zip)</a></p><p><small>Este enlace expirará en 7 días por motivos de seguridad.</small></p>',
     },
     {
       name: 'Alerta: Pedido Urgente',

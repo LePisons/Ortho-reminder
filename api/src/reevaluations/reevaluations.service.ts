@@ -16,9 +16,10 @@ export class ReevaluationsService {
   private s3Client: S3Client;
 
   constructor(private prisma: PrismaService) {
+    const accountId = process.env.R2_ACCOUNT_ID || '';
     this.s3Client = new S3Client({
       region: 'auto',
-      endpoint: process.env.R2_ENDPOINT,
+      endpoint: process.env.R2_ENDPOINT || `https://${accountId}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',

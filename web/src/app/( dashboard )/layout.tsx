@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList } from "lucide-react";
+import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { href: "/pipeline", label: "Pipeline", icon: <ClipboardList className="w-5 h-5" /> },
   { href: "/calendar", label: "Calendar", icon: <CalendarDays className="w-5 h-5" /> },
   { href: "/history", label: "Message History", icon: <MessageSquare className="w-5 h-5" /> },
+  { href: "/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
 
 function UserMenu() {

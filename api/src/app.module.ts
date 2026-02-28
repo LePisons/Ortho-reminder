@@ -18,6 +18,8 @@ import { AlignerBatchesModule } from './aligner-batches/aligner-batches.module';
 import { ReevaluationsModule } from './reevaluations/reevaluations.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { SettingsModule } from './settings/settings.module';
+import { MessageTemplatesModule } from './message-templates/message-templates.module';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     ReevaluationsModule,
     MessagingModule,
     OnboardingModule,
+    SettingsModule,
+    MessageTemplatesModule,
   ],
   controllers: [],
   providers: [ReminderService, TwilioService],

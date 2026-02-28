@@ -46,13 +46,19 @@ export class OnboardingService {
         data: { usedAt: new Date() },
       });
 
-      // 2. Mark patient as opted-in
+      const isStartingNow = patient.currentAligner === 0;
+      // We manually cast to any to bypass a Prisma typings cache issue where trackingStartedAt is unrecognised 
+      // despite the successful DB migration. 
+      const updateData: any = {
+        whatsappOptedIn: true,
+        whatsappOptedInAt: new Date(),
+        trackingStartedAt: (patient as any).trackingStartedAt || new Date(),
+        currentAligner: isStartingNow ? 1 : patient.currentAligner,
+      };
+
       await tx.patient.update({
         where: { id: patient.id },
-        data: {
-          whatsappOptedIn: true,
-          whatsappOptedInAt: new Date(),
-        },
+        data: updateData,
       });
 
       // 3. Create the first AlignerChangeEvent setting the next Reminder directly
@@ -64,7 +70,7 @@ export class OnboardingService {
       await tx.alignerChangeEvent.create({
         data: {
           patientId: patient.id,
-          alignerNumber: patient.currentAligner,
+          alignerNumber: isStartingNow ? 1 : patient.currentAligner,
           confirmedAt: new Date(),
           confirmedBy: 'auto_onboarding',
           nextReminderAt: nextReminderDate,

@@ -9,7 +9,7 @@ export class MessageLogService {
     return this.prisma.messageLog.findMany({
       // Order by the most recent messages first
       orderBy: {
-        sentAt: 'desc',
+        createdAt: 'desc',
       },
       // Include the related patient's data in the response
       include: {

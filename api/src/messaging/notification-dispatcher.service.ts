@@ -62,7 +62,8 @@ export class NotificationDispatcherService {
         where: { id: logEntry.id },
         data: {
           status: result.success ? MessageStatus.SENT : MessageStatus.FAILED,
-          errorMessage: result.error || null,
+          error: result.error || null,
+          providerMessageId: result.externalId || null,
         },
       });
       
@@ -72,7 +73,7 @@ export class NotificationDispatcherService {
         where: { id: logEntry.id },
         data: {
           status: MessageStatus.FAILED,
-          errorMessage: error.message,
+          error: error.message,
         },
       });
       this.logger.error(`Dispatch failed for job ${job.templateType}`, error);

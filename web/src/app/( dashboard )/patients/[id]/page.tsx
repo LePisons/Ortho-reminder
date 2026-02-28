@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { API_URL } from "@/lib/utils";
 import { Patient, AlignerBatch } from "@/lib/types";
 import { PatientInfoCard } from "@/components/features/patients/patient-info-card";
@@ -10,6 +10,8 @@ import { AlignerProgress } from "@/components/features/patients/aligner-progress
 import { ClinicalTab } from "@/components/features/clinical/clinical-tab";
 import { ImagesTab } from "@/components/features/clinical/images-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { NotesPanel } from "@/components/features/dashboard/notes-panel";
 import { BatchLifecycleTracker } from "@/components/features/patients/batch-lifecycle-tracker";
@@ -18,6 +20,9 @@ import { ReevaluationTracker } from "@/components/features/patients/reevaluation
 export default function PatientDetailsPage() {
   const params = useParams();
   const id = params?.id as string;
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams?.get("tab") || "clinical";
+  
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -127,6 +132,15 @@ export default function PatientDetailsPage() {
     return response.json();
   };
 
+  const getBatchUploadUrl = async (batchId: string) => {
+    const response = await fetch(`${API_URL}/aligner-batches/${batchId}/generate-upload-url`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Failed to secure presigned upload url");
+    return response.json();
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-full">Loading...</div>;
   }
@@ -143,12 +157,12 @@ export default function PatientDetailsPage() {
           <PatientInfoCard patient={patient} onUpdate={fetchPatient} />
 
           {/* Aligner Tracking Progress */}
-          <AlignerProgress patient={patient} />
+          <AlignerProgress patient={patient} onUpdate={fetchPatient} />
 
           {/* Clinical Summary — editable, always visible at the top */}
           <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
 
-          <Tabs defaultValue="clinical" className="w-full">
+          <Tabs defaultValue={defaultTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="clinical">Clinical History</TabsTrigger>
               <TabsTrigger value="batch">Lab Pipeline</TabsTrigger>
@@ -168,6 +182,7 @@ export default function PatientDetailsPage() {
                 batch={(patient.alignerBatches || []).find((b: AlignerBatch) => !['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'].includes(b.status))}
                 onStatusChange={handleStatusChange}
                 onCreateBatch={handleCreateBatch}
+                generateUploadUrl={getBatchUploadUrl}
               />
               {patient.reevaluations && patient.reevaluations.length > 0 && (
                 <ReevaluationTracker
@@ -185,6 +200,33 @@ export default function PatientDetailsPage() {
                    onCreateReevaluation={handleCreateReeval}
                    generateUploadUrl={getUploadUrl}
                  />
+              )}
+
+              {/* Batch History */}
+              {patient.alignerBatches && patient.alignerBatches.some(b => ['HANDED_TO_PATIENT', 'CANCELLED'].includes(b.status)) && (
+                <div className="pt-8">
+                  <h3 className="text-lg font-bold mb-4">Batch History</h3>
+                  <div className="space-y-4">
+                    {patient.alignerBatches
+                      .filter(b => ['HANDED_TO_PATIENT', 'CANCELLED'].includes(b.status))
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((historicalBatch) => (
+                        <Card key={historicalBatch.id} className="bg-gray-50/50">
+                          <CardContent className="p-4 flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold">Batch #{historicalBatch.batchNumber}</p>
+                              <p className="text-sm text-gray-500">
+                                {historicalBatch.alignerCount} Aligners • Delivered {historicalBatch.actualDeliveryDate ? new Date(historicalBatch.actualDeliveryDate).toLocaleDateString() : 'Unknown Data'}
+                              </p>
+                            </div>
+                            <Badge variant={historicalBatch.status === 'HANDED_TO_PATIENT' ? 'default' : 'destructive'}>
+                               {historicalBatch.status === 'HANDED_TO_PATIENT' ? 'Completed' : 'Cancelled'}
+                            </Badge>
+                          </CardContent>
+                        </Card>
+                    ))}
+                  </div>
+                </div>
               )}
             </TabsContent>
             <TabsContent value="photos">

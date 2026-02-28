@@ -2,15 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { TwilioService } from '../twilio/twilio.service';
-import { Prisma } from '@prisma/client';
+import { NotificationDispatcherService } from '../messaging/notification-dispatcher.service';
+import { Prisma, MessageTemplateType, MessageChannel } from '@prisma/client';
 
 @Injectable()
 export class PatientsService {
-  // Inject both PrismaService and TwilioService so we can use them
+  // Inject both PrismaService and NotificationDispatcherService so we can use them
   constructor(
     private prisma: PrismaService,
-    private twilioService: TwilioService,
+    private notificationDispatcher: NotificationDispatcherService,
   ) {}
 
   // This method now needs to be async to handle the message sending
@@ -58,13 +58,27 @@ export class PatientsService {
 
     // Step 2: After the patient is successfully created, try to send a welcome message
     try {
-      const welcomeMessage = `¡Hola ${newPatient.fullName}! Bienvenido/a a tu tratamiento de ortodoncia. Recibirás recordatorios para cambiar tus alineadores. ¡Mucho éxito!`;
+      // 1. Find the WELCOME template in our DB
+      const welcomeTemplate = await this.prisma.messageTemplate.findFirst({
+        where: { type: MessageTemplateType.WELCOME, channel: MessageChannel.WHATSAPP }
+      });
 
-      // Use our reusable TwilioService to send the message
-      await this.twilioService.sendWhatsApp(newPatient.phone, welcomeMessage);
+      if (welcomeTemplate) {
+        // 2. Dispatch it via the Meta integration
+        await this.notificationDispatcher.dispatch({
+          patientId: newPatient.id,
+          templateType: MessageTemplateType.WELCOME,
+          template: welcomeTemplate,
+          channel: MessageChannel.WHATSAPP,
+          recipient: newPatient.phone,
+          variables: {
+            patient_name: newPatient.fullName.split(' ')[0], // We only assume first word for Meta
+            clinic_name: 'Ortho-Reminder Clinic' // Default clinic name for now
+          },
+          triggeredBy: 'manual', 
+        });
+      }
     } catch (error) {
-      // If sending the message fails, we don't want the whole operation to crash.
-      // We log the error to the backend console for debugging, but the user still gets a success response.
       console.error(
         `Patient ${newPatient.fullName} was created, but the welcome message failed to send.`,
         error,
@@ -125,6 +139,7 @@ export class PatientsService {
         take: limit,
         orderBy: { createdAt: 'desc' }, // Always good to have a consistent order
         include: {
+          onboardingToken: true,
           alignerBatches: {
             where: { status: { notIn: ['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'] } },
             orderBy: { createdAt: 'desc' },
@@ -153,6 +168,7 @@ export class PatientsService {
     const patient = await this.prisma.patient.findUnique({
       where: { id: id },
       include: {
+        onboardingToken: true,
         clinicalRecords: true,
         patientImages: true,
         alignerBatches: {
@@ -204,6 +220,21 @@ export class PatientsService {
     });
   }
 
+  async startTracking(id: string, userId: string) {
+    const patient = await this.prisma.patient.findUnique({ where: { id } });
+    if (!patient || patient.userId !== userId) {
+      throw new Error('Patient not found or unauthorized');
+    }
+
+    return this.prisma.patient.update({
+      where: { id },
+      data: {
+        trackingStartedAt: new Date(),
+        currentAligner: patient.currentAligner === 0 ? 1 : undefined,
+      },
+    });
+  }
+
   async getStats() {
     const total = await this.prisma.patient.count();
     const active = await this.prisma.patient.count({
@@ -223,6 +254,7 @@ export class PatientsService {
     const activePatients = await this.prisma.patient.findMany({
       where: { status: 'ACTIVE' },
       include: {
+        onboardingToken: true,
         alignerBatches: {
           where: { status: { notIn: ['HANDED_TO_PATIENT', 'CANCELLED'] } },
           orderBy: { createdAt: 'desc' },
@@ -240,10 +272,11 @@ export class PatientsService {
     
     // Group patients by pipelineStage
     const pipeline = {
-      ENDING_SOON: [] as any[],
-      ORDER_SENT: [] as any[],
+      REQUIRED_FILES: [] as any[],
       IN_PRODUCTION: [] as any[],
       READY_FOR_PICKUP: [] as any[],
+      IN_TREATMENT: [] as any[],
+      ENDING_SOON: [] as any[],
       REEVALUATION: [] as any[],
     };
 
@@ -331,9 +364,8 @@ export class PatientsService {
     let urgencyStatus = 'ON_TRACK';
     if (!patient.totalAligners || patient.totalAligners === 0) {
       urgencyStatus = 'AWAITING_REEVALUATION';
-    } else if (patient.batchStartDate && patient.wearDaysPerAligner) {
-      const expectedEndDate = new Date(patient.batchStartDate);
-      // Wait, is it total aligners or current? The user requested total.
+    } else if (patient.trackingStartedAt && patient.wearDaysPerAligner) {
+      const expectedEndDate = new Date(patient.trackingStartedAt);
       expectedEndDate.setDate(expectedEndDate.getDate() + (patient.totalAligners * patient.wearDaysPerAligner));
       
       const today = new Date();
@@ -359,19 +391,29 @@ export class PatientsService {
     if (activeReeval) {
       pipelineStage = 'REEVALUATION';
     } 
-    // Priority 2: Active Batch in Pipeline
+    // Priority 2: Pending/Active Batch
     else if (activeBatch) {
-      if (activeBatch.status === 'ORDER_SENT') {
-        pipelineStage = 'ORDER_SENT';
-      } else if (activeBatch.status === 'IN_PRODUCTION') {
+      if (activeBatch.status === 'NEEDED') {
+        pipelineStage = 'REQUIRED_FILES';
+      } else if (activeBatch.status === 'ORDER_SENT' || activeBatch.status === 'IN_PRODUCTION') {
         pipelineStage = 'IN_PRODUCTION';
       } else if (activeBatch.status === 'DELIVERED_TO_CLINIC') {
         pipelineStage = 'READY_FOR_PICKUP';
+      } else if (activeBatch.status === 'HANDED_TO_PATIENT') {
+        if (urgencyStatus === 'ENDING_SOON' || urgencyStatus === 'OVERDUE') {
+          pipelineStage = 'ENDING_SOON';
+        } else {
+          pipelineStage = 'IN_TREATMENT';
+        }
       }
     } 
     // Priority 3: Ending Soon (derived from Urgency)
     else if (urgencyStatus === 'ENDING_SOON' || urgencyStatus === 'OVERDUE') {
       pipelineStage = 'ENDING_SOON';
+    }
+    // Fallback: Assigned to REQUIRED_FILES
+    else {
+      pipelineStage = 'REQUIRED_FILES';
     }
 
     return {
