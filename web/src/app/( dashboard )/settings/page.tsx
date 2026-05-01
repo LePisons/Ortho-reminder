@@ -25,12 +25,15 @@ export default function SettingsPage() {
   // ----- CLINICAL SETTINGS STATE -----
   // const [settings, setSettings] = useState<Setting[]>([]);
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [templateChannelFilter, setTemplateChannelFilter] = useState("ALL");
   const [loadingConfig, setLoadingConfig] = useState(true);
 
   const [labTurnaroundDays, setLabTurnaroundDays] = useState("");
   const [urgencyThresholdDays, setUrgencyThresholdDays] = useState("");
   const [technicianEmail, setTechnicianEmail] = useState("");
   const [wearDaysPerAligner, setWearDaysPerAligner] = useState("");
+  const [orthodontistEmail, setOrthodontistEmail] = useState("");
+  const [batchEndingThreshold, setBatchEndingThreshold] = useState("");
 
   useEffect(() => {
     async function loadData() {
@@ -48,6 +51,8 @@ export default function SettingsPage() {
           if (s.key === "urgency_threshold_days") setUrgencyThresholdDays(s.value);
           if (s.key === "technician_email") setTechnicianEmail(s.value);
           if (s.key === "wear_days_per_aligner") setWearDaysPerAligner(s.value);
+          if (s.key === "orthodontist_email") setOrthodontistEmail(s.value);
+          if (s.key === "batch_ending_threshold") setBatchEndingThreshold(s.value);
         });
       } catch {
         toast.error("Error al cargar la configuración clínica");
@@ -126,6 +131,8 @@ export default function SettingsPage() {
         { key: "urgency_threshold_days", value: urgencyThresholdDays },
         { key: "technician_email", value: technicianEmail },
         { key: "wear_days_per_aligner", value: wearDaysPerAligner },
+        { key: "orthodontist_email", value: orthodontistEmail },
+        { key: "batch_ending_threshold", value: batchEndingThreshold },
       ]);
       toast.success("Configuración clínica guardada");
     } catch {
@@ -241,6 +248,34 @@ export default function SettingsPage() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="orthoEmail" className="text-gray-700 font-medium">
+                    Mail del Ortodoncista (Para alertas)
+                  </Label>
+                  <Input
+                    id="orthoEmail"
+                    type="email"
+                    value={orthodontistEmail}
+                    onChange={(e) => setOrthodontistEmail(e.target.value)}
+                    className="max-w-md"
+                  />
+                  <p className="text-xs text-muted-foreground">Recibirá alertas cuando un batch esté por terminar o se necesite una cita.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="batchThreshold" className="text-gray-700 font-medium">
+                    Umbral de alerta &quot;Batch por terminar&quot; (Nro. de alineadores)
+                  </Label>
+                  <Input
+                    id="batchThreshold"
+                    type="number"
+                    value={batchEndingThreshold}
+                    onChange={(e) => setBatchEndingThreshold(e.target.value)}
+                    className="max-w-[200px]"
+                  />
+                  <p className="text-xs text-muted-foreground">Se enviará una alerta cuando al paciente le queden esta cantidad o menos de alineadores.</p>
+                </div>
+
                 <hr className="my-6 border-gray-100" />
                 
                 <div className="flex justify-start">
@@ -258,11 +293,34 @@ export default function SettingsPage() {
 
         {/* TEMPLATES TAB */}
         <TabsContent value="templates" className="space-y-6">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Plantillas Autodespachables</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Las variables entre doble llave {'{{}}'} como {'{{patient_name}}'} serán reemplazadas dinámicamente por el despachador.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Plantillas Autodespachables</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Las variables entre doble llave {'{{}}'} como {'{{patient_name}}'} serán reemplazadas dinámicamente por el despachador.
+              </p>
+            </div>
+
+            {/* Channel filter buttons */}
+            <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1 shrink-0">
+              {[
+                { value: "ALL", label: "Todos" },
+                { value: "EMAIL", label: "✉️ Email" },
+                { value: "WHATSAPP", label: "💬 WhatsApp" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setTemplateChannelFilter(opt.value)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    templateChannelFilter === opt.value
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loadingConfig ? (
@@ -272,7 +330,9 @@ export default function SettingsPage() {
              </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {templates.map((template) => (
+              {templates
+                .filter((t) => templateChannelFilter === "ALL" || t.channel === templateChannelFilter)
+                .map((template) => (
                 <div
                   key={template.id}
                   className="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex flex-col h-full hover:border-[#254F22]/30 transition-colors"

@@ -10,7 +10,15 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.use(cookieParser());
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGIN || 'http://localhost:3000',
+    origin: function (origin, callback) {
+      if (!origin || origin === 'http://localhost:3000' || (origin && origin.endsWith('.ngrok-free.app'))) {
+        callback(null, true);
+      } else if (process.env.ALLOWED_ORIGIN && origin === process.env.ALLOWED_ORIGIN) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
 

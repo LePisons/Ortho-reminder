@@ -178,7 +178,7 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
   const [expandedDates, setExpandedDates] = useState<Set<string>>(() => {
     return new Set(sortedDates.length > 0 ? [sortedDates[0]] : []);
   });
-  const [newSessionDate, setNewSessionDate] = useState("");
+  const [newSessionDate, setNewSessionDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [showNewSession, setShowNewSession] = useState(false);
 
   // Upload dialog state
@@ -344,7 +344,7 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
             <img
               src={existing.url}
               alt={slot.label}
-              className="object-cover w-full h-full"
+              className="object-contain w-full h-full"
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <Button
@@ -434,7 +434,10 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
             </Button>
           </div>
         ) : (
-          <Button onClick={() => setShowNewSession(true)}>
+          <Button onClick={() => {
+            setNewSessionDate(format(new Date(), "yyyy-MM-dd"));
+            setShowNewSession(true);
+          }}>
             <Plus className="mr-2 h-4 w-4" /> New Session
           </Button>
         )}

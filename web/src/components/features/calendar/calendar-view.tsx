@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, RefreshCw, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { API_URL, cn } from "@/lib/utils";
 import { Appointment, Patient } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const EVENT_COLORS = [
     "bg-blue-50 text-blue-700 border-l-blue-500 hover:bg-blue-100 ring-1 ring-blue-500/10",
@@ -29,7 +30,12 @@ const getEventColor = (id: string) => {
     return EVENT_COLORS[Math.abs(hash) % EVENT_COLORS.length];
 };
 
-export function CalendarView() {
+interface CalendarViewProps {
+  onToggleNotes?: () => void;
+  notesOpen?: boolean;
+}
+
+export function CalendarView({ onToggleNotes, notesOpen }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -243,6 +249,19 @@ export function CalendarView() {
         </div>
 
         <div className="flex items-center gap-2">
+            {onToggleNotes && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onToggleNotes}
+                className={`h-11 w-11 rounded-lg border-gray-200 hover:bg-gray-50 transition-colors ${
+                  notesOpen ? "text-amber-500 bg-amber-50 border-amber-200" : "text-gray-600"
+                }`}
+                title={notesOpen ? "Hide notes" : "Show notes"}
+              >
+                <StickyNote className="h-5 w-5" />
+              </Button>
+            )}
             <Button 
                 variant="outline" 
                 size="icon" 
@@ -320,7 +339,8 @@ export function CalendarView() {
       </div>
 
       {/* Calendar Grid */}
-      <div className="flex-1 bg-gray-100 gap-px grid grid-cols-7 grid-rows-6 border-b border-gray-100 min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="bg-gray-100 gap-px grid grid-cols-7" style={{ gridAutoRows: 'minmax(130px, 1fr)' }}>
         {loading ? (
              Array.from({ length: 42 }).map((_, i) => (
                 <div key={i} className="bg-white p-3 min-h-0 h-full">
@@ -351,7 +371,7 @@ export function CalendarView() {
                             }
                         }}
                         className={cn(
-                            "min-h-0 h-full bg-white p-2.5 transition-colors flex flex-col gap-1 group relative cursor-crosshair",
+                            "bg-white p-2.5 transition-colors flex flex-col gap-1 group relative cursor-crosshair",
                             !isCurrentMonth && "text-gray-300",
                             isCurrentMonth && "hover:bg-primary/5"
                         )}
@@ -367,9 +387,9 @@ export function CalendarView() {
                             </span>
                         </div>
                         
-                        {/* Events */}
-                        <div className="flex-1 flex flex-col gap-1 overflow-y-auto overflow-x-hidden min-h-0 scrollbar-thin scrollbar-thumb-gray-300">
-                            {dayAppointments.map(appt => (
+                        {/* Events — show max 2, then +N more */}
+                        <div className="flex-1 flex flex-col gap-1 overflow-hidden min-h-0">
+                            {dayAppointments.slice(0, 2).map(appt => (
                                 <div 
                                     key={appt.id}
                                     draggable
@@ -393,11 +413,47 @@ export function CalendarView() {
                                     <span className="truncate flex-1 font-semibold">{appt.title}</span>
                                 </div>
                             ))}
+                            {dayAppointments.length > 2 && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-[11px] font-bold text-gray-500 hover:text-primary px-2 py-1 rounded-md hover:bg-primary/5 transition-colors text-left"
+                                  >
+                                    +{dayAppointments.length - 2} more
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 p-3" align="start">
+                                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                    {format(day, "EEEE, MMM d")}
+                                  </p>
+                                  <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                                    {dayAppointments.map(appt => (
+                                      <button
+                                        key={appt.id}
+                                        onClick={() => {
+                                          setSelectedEvent(appt);
+                                          setIsDetailsOpen(true);
+                                        }}
+                                        className={cn(
+                                          "px-2.5 py-2 text-xs font-semibold rounded-md cursor-pointer transition-all hover:-translate-y-[1px] flex items-center gap-2 border-l-[3px] text-left w-full",
+                                          getEventColor(appt.id),
+                                        )}
+                                      >
+                                        <span className="opacity-70 font-semibold shrink-0">{format(parseISO(appt.start), 'HH:mm')}</span>
+                                        <span className="truncate">{appt.title}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            )}
                         </div>
                     </div>
                 );
             })
         )}
+      </div>
       </div>
 
       {/* Useful Info Block */}

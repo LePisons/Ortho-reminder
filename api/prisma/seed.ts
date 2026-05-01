@@ -12,6 +12,8 @@ async function main() {
     { key: 'technician_email', value: '' },
     { key: 'orthodontist_whatsapp', value: '' },
     { key: 'wear_days_per_aligner', value: '14' },
+    { key: 'orthodontist_email', value: '' },
+    { key: 'batch_ending_threshold', value: '3' },
   ];
 
   for (const setting of settings) {
@@ -59,6 +61,31 @@ async function main() {
       type: MessageTemplateType.WELCOME,
       channel: MessageChannel.WHATSAPP,
       content: '¡Bienvenido/a {{patient_name}} a tu tratamiento con alineadores invisibles! Activa tus recordatorios aquí: {{onboarding_url}}',
+    },
+    // --- EMAIL TEMPLATES ---
+    {
+      name: 'Recordatorio Cambio de Alineador (Email)',
+      type: MessageTemplateType.ALIGNER_CHANGE_REMINDER,
+      channel: MessageChannel.EMAIL,
+      content: '<h2>¡Hola {{patient_name}}! 🦷</h2><p>Es hora de cambiar a tu alineador <strong>#{{aligner_number}}</strong>.</p><p>Recuerda usarlo al menos 22 horas al día para que tu tratamiento avance según lo planificado.</p><p>Si tienes alguna duda, no dudes en contactarnos.</p><br><p style="color:#888;font-size:12px;">— Tu equipo de ortodoncia</p>',
+    },
+    {
+      name: 'Alerta: Batch por Terminar (Lab)',
+      type: MessageTemplateType.BATCH_ENDING_LAB_ALERT,
+      channel: MessageChannel.EMAIL,
+      content: '<h2>⚠️ Alerta de Stock — Paciente por terminar alineadores</h2><p>El paciente <strong>{{patient_name}}</strong> se encuentra en el alineador <strong>#{{current_aligner}}</strong> de <strong>{{total_aligners}}</strong>.</p><p>Le quedan aproximadamente <strong>{{aligners_remaining}} alineadores</strong> (~{{days_remaining}} días).</p><p>Es necesario coordinar el siguiente batch de producción.</p><br><p style="color:#888;font-size:12px;">— Sistema Alnix</p>',
+    },
+    {
+      name: 'Cita Necesaria: Fin de Tratamiento',
+      type: MessageTemplateType.APPOINTMENT_NEEDED,
+      channel: MessageChannel.EMAIL,
+      content: '<h2>📅 Cita Requerida — Fin de Tratamiento</h2><p>El paciente <strong>{{patient_name}}</strong> está por finalizar su tratamiento con alineadores.</p><p>Alineador actual: <strong>#{{current_aligner}}</strong> de <strong>{{total_aligners}}</strong></p><p>Fecha estimada de fin: <strong>{{estimated_end_date}}</strong></p><p>Se recomienda agendar una cita final de evaluación.</p><br><p style="color:#888;font-size:12px;">— Sistema Alnix</p>',
+    },
+    {
+      name: 'Bienvenida al Tratamiento (Email)',
+      type: MessageTemplateType.WELCOME,
+      channel: MessageChannel.EMAIL,
+      content: '<h2>¡Bienvenido/a {{patient_name}}! 🎉</h2><p>Nos alegra que comiences tu tratamiento con alineadores invisibles en <strong>Alnix</strong>.</p><p>Desde ahora recibirás recordatorios por email cada vez que debas cambiar de alineador.</p><p>Si tienes alguna duda sobre tu tratamiento, no dudes en contactarnos.</p><br><p style="color:#888;font-size:12px;">— Tu equipo en Alnix</p>',
     },
   ];
 

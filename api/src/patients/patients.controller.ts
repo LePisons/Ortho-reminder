@@ -102,6 +102,12 @@ export class PatientsController {
     return this.patientsService.getPipeline();
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('search')
+  searchPatients(@Query('q') q: string, @Request() req) {
+    return this.patientsService.searchPatients(q || '', req.user.userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     // REMOVE THE '+' SIGN HERE
@@ -114,10 +120,58 @@ export class PatientsController {
     return this.patientsService.update(id, updatePatientDto);
   }
 
+  @Patch(':id/adjust-aligner')
+  adjustAligner(
+    @Param('id') id: string,
+    @Body() body: { alignerNumber: number },
+  ) {
+    return this.patientsService.adjustAligner(id, body.alignerNumber);
+  }
+
+  @Patch(':id/last-appointment')
+  setLastAppointment(
+    @Param('id') id: string,
+    @Body() body: { date: string },
+  ) {
+    return this.patientsService.setLastAppointment(id, body.date);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post(':id/start-tracking')
   startTracking(@Param('id') id: string, @Request() req) {
     return this.patientsService.startTracking(id, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/start-treatment')
+  startTreatment(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      startingAligner: number;
+      startDate: string;
+      wearDaysPerAligner?: number;
+      totalAligners?: number;
+    },
+    @Request() req,
+  ) {
+    return this.patientsService.startTreatment(
+      id,
+      body.startingAligner,
+      body.startDate,
+      req.user.userId,
+      body.wearDaysPerAligner,
+      body.totalAligners,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/pipeline-override')
+  setPipelineOverride(
+    @Param('id') id: string,
+    @Body() body: { stage: string | null },
+  ) {
+    return this.patientsService.setPipelineOverride(id, body.stage ?? null);
   }
 
   @Delete(':id')

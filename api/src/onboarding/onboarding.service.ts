@@ -4,10 +4,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AlignerService } from '../patients/aligner.service';
 
 @Injectable()
 export class OnboardingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private alignerService: AlignerService,
+  ) {}
 
   async validateToken(token: string) {
     const onboardingToken = await this.prisma.onboardingToken.findUnique({
@@ -46,37 +50,30 @@ export class OnboardingService {
         data: { usedAt: new Date() },
       });
 
-      const isStartingNow = patient.currentAligner === 0;
-      // We manually cast to any to bypass a Prisma typings cache issue where trackingStartedAt is unrecognised 
-      // despite the successful DB migration. 
+      // 2. Enable WhatsApp + set trackingStartedAt if not already set
       const updateData: any = {
         whatsappOptedIn: true,
         whatsappOptedInAt: new Date(),
         trackingStartedAt: (patient as any).trackingStartedAt || new Date(),
-        currentAligner: isStartingNow ? 1 : patient.currentAligner,
       };
 
+      // Only set currentAligner to 1 if tracking has not started yet
+      // (AlignerService will handle the write + anchor below)
       await tx.patient.update({
         where: { id: patient.id },
         data: updateData,
       });
-
-      // 3. Create the first AlignerChangeEvent setting the next Reminder directly
-      const nextReminderDate = new Date();
-      nextReminderDate.setDate(
-        nextReminderDate.getDate() + patient.wearDaysPerAligner,
-      );
-
-      await tx.alignerChangeEvent.create({
-        data: {
-          patientId: patient.id,
-          alignerNumber: isStartingNow ? 1 : patient.currentAligner,
-          confirmedAt: new Date(),
-          confirmedBy: 'auto_onboarding',
-          nextReminderAt: nextReminderDate,
-        },
-      });
     });
+
+    // 3. Set currentAligner through the single write path (only if not yet started)
+    if (patient.currentAligner === 0) {
+      await this.alignerService.setCurrentAligner(
+        patient.id,
+        1,
+        new Date(),
+        'onboarding',
+      );
+    }
 
     return { success: true };
   }

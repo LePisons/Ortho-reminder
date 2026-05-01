@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings } from "lucide-react";
+import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { PatientSearch } from "@/components/features/patients/patient-search";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -14,7 +15,7 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
 
-function UserMenu() {
+function UserMenu({ collapsed }: { collapsed: boolean }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -42,34 +43,34 @@ function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 rounded-2xl p-2.5 transition-all duration-200 hover:bg-white/10 group focus:outline-none"
+        className={`flex w-full items-center gap-3 rounded-2xl p-2.5 transition-all duration-200 hover:bg-white/10 group focus:outline-none ${collapsed ? "justify-center" : ""}`}
       >
-        {/* Avatar */}
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-primary text-sm font-bold shadow-sm">
           {initials}
         </div>
-        {/* Info */}
-        <div className="flex-1 overflow-hidden text-left">
-          <p className="truncate text-sm font-bold text-white">
-            {user?.name || "User"}
-          </p>
-          <p className="truncate text-xs text-white/70">{user?.email}</p>
-        </div>
-        {/* Chevron */}
-        <svg
-          className={`h-4 w-4 shrink-0 text-white/50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        {!collapsed && (
+          <>
+            <div className="flex-1 overflow-hidden text-left">
+              <p className="truncate text-sm font-bold text-white">
+                {user?.name || "User"}
+              </p>
+              <p className="truncate text-xs text-white/70">{user?.email}</p>
+            </div>
+            <svg
+              className={`h-4 w-4 shrink-0 text-white/50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </>
+        )}
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+        <div className={`absolute top-full ${collapsed ? "left-full ml-2" : "left-0 right-0"} mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 min-w-[200px]`}>
           <div className="p-1.5">
             <Link
               href="/settings"
@@ -109,8 +110,19 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const { isAuthenticated, isLoading } = useAuth();
+  const [collapsed, setCollapsed] = useState(false);
 
-  // Show a loading state while checking auth
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved === "true") setCollapsed(true);
+  }, []);
+
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("sidebar-collapsed", String(next));
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -122,44 +134,80 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* Sidebar */}
-      <aside className="relative z-10 flex w-[280px] flex-col bg-[#3a7a35]/85 backdrop-blur-2xl border-r border-white/20 rounded-r-3xl shadow-2xl shrink-0 my-0 shadow-primary/20">
+      <aside
+        className={`relative z-10 flex flex-col bg-[#3a7a35]/85 backdrop-blur-2xl border-r border-white/20 rounded-r-3xl shadow-2xl shrink-0 my-0 shadow-primary/20 transition-all duration-300 ease-in-out overflow-hidden ${
+          collapsed ? "w-[72px]" : "w-[280px]"
+        }`}
+      >
         {/* Logo */}
-        <div className="px-6 pt-10 pb-8 flex items-center gap-3">
+        <div className={`flex items-center gap-3 pt-10 pb-8 transition-all duration-300 ${collapsed ? "px-0 justify-center" : "px-6"}`}>
           <div className="w-10 h-10 rounded-xl border-2 border-white/20 flex items-center justify-center shrink-0 shadow-sm">
              <span className="text-white text-xl font-bold">O</span>
           </div>
-          <h2 className="text-2xl font-black tracking-tight text-white">
-            OrthoReminder
-          </h2>
+          {!collapsed && (
+            <h2 className="text-2xl font-black tracking-tight text-white whitespace-nowrap">
+              OrthoReminder
+            </h2>
+          )}
         </div>
 
         {/* User Section */}
         {isAuthenticated && (
-          <div className="px-4 pb-8 shrink-0">
-            <UserMenu />
+          <div className={`shrink-0 transition-all duration-300 ${collapsed ? "px-2 pb-4" : "px-4 pb-8"}`}>
+            <UserMenu collapsed={collapsed} />
+          </div>
+        )}
+
+        {/* Patient Search */}
+        {isAuthenticated && (
+          <div className={`shrink-0 transition-all duration-300 ${collapsed ? "px-2 pb-2" : "px-4 pb-4"}`}>
+            <PatientSearch collapsed={collapsed} />
           </div>
         )}
 
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col gap-2 px-4 pb-6">
+        <nav className={`flex flex-1 flex-col gap-2 pb-6 transition-all duration-300 ${collapsed ? "px-2" : "px-4"}`}>
           {navItems.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-4 px-4 py-3.5 text-sm transition-all duration-200 ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center gap-4 py-3.5 text-sm transition-all duration-200 ${
+                  collapsed ? "px-0 justify-center" : "px-4"
+                } ${
                   isActive
                     ? "bg-white/10 text-white font-bold rounded-2xl shadow-sm border border-white/5 backdrop-blur-sm"
                     : "text-white/70 hover:bg-white/5 hover:text-white font-medium rounded-2xl border border-transparent"
                 }`}
               >
-                <span className={`text-lg ${isActive ? 'opacity-100' : 'opacity-70'}`}>{item.icon}</span>
-                {item.label}
+                <span className={`text-lg shrink-0 ${isActive ? 'opacity-100' : 'opacity-70'}`}>{item.icon}</span>
+                {!collapsed && <span className="whitespace-nowrap">{item.label}</span>}
               </Link>
             );
           })}
         </nav>
+
+        {/* Collapse Toggle */}
+        <div className={`pb-6 shrink-0 ${collapsed ? "px-2" : "px-4"}`}>
+          <button
+            onClick={toggleCollapsed}
+            className={`flex items-center gap-3 w-full py-3 text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-200 ${
+              collapsed ? "justify-center px-0" : "px-4"
+            }`}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? (
+              <ChevronsRight className="w-5 h-5 shrink-0" />
+            ) : (
+              <>
+                <ChevronsLeft className="w-5 h-5 shrink-0" />
+                <span className="whitespace-nowrap">Collapse</span>
+              </>
+            )}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content Area */}
