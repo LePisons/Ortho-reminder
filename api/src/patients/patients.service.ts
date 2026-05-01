@@ -255,6 +255,7 @@ export class PatientsService {
     }
 
     const parsedDate = new Date(startDate + 'T00:00:00');
+    const effectiveWearDays = wearDaysPerAligner ?? patient.wearDaysPerAligner ?? 14;
 
     // First update treatment-level fields (dates, wear days, total aligners)
     await this.prisma.patient.update({
@@ -268,11 +269,28 @@ export class PatientsService {
       },
     });
 
-    // Then set the aligner through the single write path (handles clamping + audit)
+    // If the start date is in the past, fast-forward currentAligner to where
+    // the patient actually is today based on elapsed wear periods.
+    // e.g. started April 8 with aligner 1, 10 days/aligner, today is May 1:
+    //   → 23 days elapsed → 2 full periods → actualAligner = 1 + 2 = 3
+    //   → anchor (lastAlignerSetAt) = April 8 + 20 days = April 28
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysSinceStart = Math.max(0, Math.floor((today.getTime() - parsedDate.getTime()) / msPerDay));
+    const stepsElapsed = Math.floor(daysSinceStart / effectiveWearDays);
+    const actualCurrentAligner = startingAligner + stepsElapsed;
+
+    // The anchor is the date when the *current* aligner started being worn
+    const anchorDate = stepsElapsed > 0
+      ? new Date(parsedDate.getTime() + stepsElapsed * effectiveWearDays * msPerDay)
+      : parsedDate;
+
+    // Set through the single write path (handles clamping + audit record)
     const updated = await this.alignerService.setCurrentAligner(
       id,
-      startingAligner,
-      parsedDate,
+      actualCurrentAligner,
+      anchorDate,
       'manual_start',
     );
 

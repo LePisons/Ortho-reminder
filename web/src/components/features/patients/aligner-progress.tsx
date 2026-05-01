@@ -246,7 +246,11 @@ export function AlignerProgress({ patient, onUpdate }: AlignerProgressProps) {
   const predictedEnd = addDays(today, daysRemaining);
 
   const lastApptDate = patient.lastAppointmentDate ? new Date(patient.lastAppointmentDate) : null;
-  const appointmentIntervalDays = wearDaysPerAligner * 2;
+  // How many aligners does the patient go through in ~1 month (30 days)?
+  // e.g. 10 days/aligner → 3 aligners/month → 30-day appointment interval
+  //      15 days/aligner → 2 aligners/month → 30-day appointment interval
+  const alignersPerAppointment = Math.max(1, Math.round(30 / wearDaysPerAligner));
+  const appointmentIntervalDays = alignersPerAppointment * wearDaysPerAligner;
   const nextAppointmentEstimate = lastApptDate
     ? addDays(lastApptDate, appointmentIntervalDays)
     : addDays(today, appointmentIntervalDays);
