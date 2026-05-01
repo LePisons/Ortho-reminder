@@ -3,14 +3,15 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationDispatcherService } from '../messaging/notification-dispatcher.service';
+import { AlignerService } from './aligner.service';
 import { Prisma, MessageTemplateType, MessageChannel } from '@prisma/client';
 
 @Injectable()
 export class PatientsService {
-  // Inject both PrismaService and NotificationDispatcherService so we can use them
   constructor(
     private prisma: PrismaService,
     private notificationDispatcher: NotificationDispatcherService,
+    private alignerService: AlignerService,
   ) {}
 
   // This method now needs to be async to handle the message sending
@@ -56,31 +57,32 @@ export class PatientsService {
       }
     });
 
-    // Step 2: After the patient is successfully created, try to send a welcome message
+    // Step 2: After the patient is successfully created, try to send a welcome message via EMAIL
     try {
-      // 1. Find the WELCOME template in our DB
+      // 1. Find the WELCOME template for EMAIL channel
       const welcomeTemplate = await this.prisma.messageTemplate.findFirst({
-        where: { type: MessageTemplateType.WELCOME, channel: MessageChannel.WHATSAPP }
+        where: { type: MessageTemplateType.WELCOME, channel: MessageChannel.EMAIL, isActive: true }
       });
 
-      if (welcomeTemplate) {
-        // 2. Dispatch it via the Meta integration
+      if (welcomeTemplate && newPatient.email) {
+        // 2. Dispatch it via Resend (email)
         await this.notificationDispatcher.dispatch({
           patientId: newPatient.id,
           templateType: MessageTemplateType.WELCOME,
           template: welcomeTemplate,
-          channel: MessageChannel.WHATSAPP,
-          recipient: newPatient.phone,
+          channel: MessageChannel.EMAIL,
+          recipient: newPatient.email,
           variables: {
-            patient_name: newPatient.fullName.split(' ')[0], // We only assume first word for Meta
-            clinic_name: 'Ortho-Reminder Clinic' // Default clinic name for now
+            patient_name: newPatient.fullName.split(' ')[0],
+            clinic_name: 'Alnix'
           },
-          triggeredBy: 'manual', 
+          triggeredBy: 'manual',
+          subject: `¡Bienvenido/a a Alnix, ${newPatient.fullName.split(' ')[0]}!`,
         });
       }
     } catch (error) {
       console.error(
-        `Patient ${newPatient.fullName} was created, but the welcome message failed to send.`,
+        `Patient ${newPatient.fullName} was created, but the welcome email failed to send.`,
         error,
       );
     }
@@ -220,19 +222,125 @@ export class PatientsService {
     });
   }
 
+  /**
+   * @deprecated Use startTreatment() instead.
+   * Kept for backward compatibility — redirects to startTreatment with aligner=1 and today's date.
+   */
   async startTracking(id: string, userId: string) {
     const patient = await this.prisma.patient.findUnique({ where: { id } });
     if (!patient || patient.userId !== userId) {
       throw new Error('Patient not found or unauthorized');
     }
 
-    return this.prisma.patient.update({
+    const startingAligner = patient.currentAligner > 0 ? patient.currentAligner : 1;
+    return this.startTreatment(id, startingAligner, new Date().toISOString().split('T')[0], userId);
+  }
+
+  /**
+   * startTreatment: Initializes (or re-initializes) aligner tracking with a
+   * specific starting aligner number and date. Replaces the simpler
+   * startTracking for cases where the patient is already mid-treatment.
+   */
+  async startTreatment(
+    id: string,
+    startingAligner: number,
+    startDate: string,
+    userId: string,
+    wearDaysPerAligner?: number,
+    totalAligners?: number,
+  ) {
+    const patient = await this.prisma.patient.findUnique({ where: { id } });
+    if (!patient || patient.userId !== userId) {
+      throw new Error('Patient not found or unauthorized');
+    }
+
+    const parsedDate = new Date(startDate + 'T00:00:00');
+    const effectiveWearDays = wearDaysPerAligner ?? patient.wearDaysPerAligner ?? 14;
+
+    // First update treatment-level fields (dates, wear days, total aligners)
+    await this.prisma.patient.update({
       where: { id },
       data: {
-        trackingStartedAt: new Date(),
-        currentAligner: patient.currentAligner === 0 ? 1 : undefined,
+        trackingStartedAt: parsedDate,
+        treatmentStartDate: parsedDate,
+        lastAppointmentDate: parsedDate,
+        ...(wearDaysPerAligner !== undefined && { wearDaysPerAligner }),
+        ...(totalAligners !== undefined && { totalAligners }),
       },
     });
+
+    // If the start date is in the past, fast-forward currentAligner to where
+    // the patient actually is today based on elapsed wear periods.
+    // e.g. started April 8 with aligner 1, 10 days/aligner, today is May 1:
+    //   → 23 days elapsed → 2 full periods → actualAligner = 1 + 2 = 3
+    //   → anchor (lastAlignerSetAt) = April 8 + 20 days = April 28
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysSinceStart = Math.max(0, Math.floor((today.getTime() - parsedDate.getTime()) / msPerDay));
+    const stepsElapsed = Math.floor(daysSinceStart / effectiveWearDays);
+    const actualCurrentAligner = startingAligner + stepsElapsed;
+
+    // The anchor is the date when the *current* aligner started being worn
+    const anchorDate = stepsElapsed > 0
+      ? new Date(parsedDate.getTime() + stepsElapsed * effectiveWearDays * msPerDay)
+      : parsedDate;
+
+    // Set through the single write path (handles clamping + audit record)
+    const updated = await this.alignerService.setCurrentAligner(
+      id,
+      actualCurrentAligner,
+      anchorDate,
+      'manual_start',
+    );
+
+    return this.mapPatientWithUrgency(updated);
+  }
+
+  /**
+   * setPipelineOverride: Manually fixes the patient into a specific pipeline
+   * stage. Pass null to restore automatic calculation.
+   */
+  async setPipelineOverride(id: string, stage: string | null) {
+    const VALID_STAGES = [
+      'REQUIRED_FILES',
+      'IN_PRODUCTION',
+      'READY_FOR_PICKUP',
+      'IN_TREATMENT',
+      'ENDING_SOON',
+      'REEVALUATION',
+    ];
+
+    if (stage !== null && !VALID_STAGES.includes(stage)) {
+      throw new Error(`Invalid pipeline stage: ${stage}`);
+    }
+
+    const updated = await this.prisma.patient.update({
+      where: { id },
+      data: { pipelineOverride: stage },
+    });
+
+    return this.mapPatientWithUrgency(updated);
+  }
+
+  async adjustAligner(id: string, alignerNumber: number) {
+    // Route through the single write path — resets the cron anchor to today
+    const updated = await this.alignerService.setCurrentAligner(
+      id,
+      alignerNumber,
+      new Date(),
+      'manual_adjustment',
+    );
+    return this.mapPatientWithUrgency(updated);
+  }
+
+  async setLastAppointment(id: string, date: string) {
+    const updated = await this.prisma.patient.update({
+      where: { id },
+      data: { lastAppointmentDate: new Date(date + 'T00:00:00') },
+    });
+
+    return this.mapPatientWithUrgency(updated);
   }
 
   async getStats() {
@@ -316,7 +424,10 @@ export class PatientsService {
 
       const remainder =
         daysSinceStart >= 0 ? daysSinceStart % patient.changeFrequency : 0;
-      const daysUntilNextChange = patient.changeFrequency - remainder;
+      // If remainder is 0 and treatment has started, today IS a change day
+      const daysUntilNextChange = (daysSinceStart > 0 && remainder === 0)
+        ? 0
+        : patient.changeFrequency - remainder;
 
       const nextChangeDate = new Date(today);
       nextChangeDate.setDate(today.getDate() + daysUntilNextChange);
@@ -357,6 +468,44 @@ export class PatientsService {
     });
   }
 
+  async searchPatients(query: string, userId: string) {
+    if (!query || query.trim().length === 0) return [];
+
+    const patients = await this.prisma.patient.findMany({
+      where: {
+        userId,
+        fullName: { contains: query, mode: 'insensitive' },
+      },
+      take: 8,
+      orderBy: { fullName: 'asc' },
+      include: {
+        alignerBatches: {
+          where: { status: { notIn: ['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+        reevaluations: {
+          where: { status: { in: ['NEEDED', 'SCAN_UPLOADED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    return patients.map(p => {
+      const mapped = this.mapPatientWithUrgency(p);
+      return {
+        id: mapped.id,
+        fullName: mapped.fullName,
+        currentAligner: mapped.currentAligner,
+        totalAligners: mapped.totalAligners,
+        status: mapped.status,
+        avatarUrl: mapped.avatarUrl,
+        pipelineStage: mapped.pipelineStage,
+      };
+    });
+  }
+
   // Helper method to compute urgencyStatus and append to patient objects
   private mapPatientWithUrgency(patient: any) {
     if (!patient) return null;
@@ -387,8 +536,12 @@ export class PatientsService {
     const activeBatch = patient.alignerBatches?.[0];
     const activeReeval = patient.reevaluations?.[0];
 
+    // Priority 0: Manual override — doctor explicitly set a stage
+    if (patient.pipelineOverride) {
+      pipelineStage = patient.pipelineOverride;
+    }
     // Priority 1: Active Re-evaluation
-    if (activeReeval) {
+    else if (activeReeval) {
       pipelineStage = 'REEVALUATION';
     } 
     // Priority 2: Pending/Active Batch
@@ -420,6 +573,7 @@ export class PatientsService {
       ...patient,
       urgencyStatus,
       pipelineStage,
+      pipelineIsManual: !!patient.pipelineOverride,
     };
   }
 }

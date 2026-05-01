@@ -7,6 +7,7 @@ import { Patient, AlignerBatch } from "@/lib/types";
 import { PatientInfoCard } from "@/components/features/patients/patient-info-card";
 import { PatientSummaryCard } from "@/components/features/patients/patient-summary-card";
 import { AlignerProgress } from "@/components/features/patients/aligner-progress";
+import { PipelineStageSelector } from "@/components/features/patients/pipeline-stage-selector";
 import { ClinicalTab } from "@/components/features/clinical/clinical-tab";
 import { ImagesTab } from "@/components/features/clinical/images-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
@@ -155,6 +156,19 @@ export default function PatientDetailsPage() {
         {/* Main Content */}
         <div className="xl:col-span-3 space-y-6">
           <PatientInfoCard patient={patient} onUpdate={fetchPatient} />
+
+          {/* Pipeline Stage — manual override control */}
+          <div className="bg-white rounded-xl shadow-sm border px-5 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Pipeline Stage</p>
+              <PipelineStageSelector patient={patient} onUpdate={fetchPatient} />
+            </div>
+            {patient.pipelineIsManual && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                Stage forzado manualmente — no se calcula automáticamente
+              </p>
+            )}
+          </div>
 
           {/* Aligner Tracking Progress */}
           <AlignerProgress patient={patient} onUpdate={fetchPatient} />

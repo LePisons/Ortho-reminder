@@ -8,6 +8,7 @@ import { NotificationDispatcherService } from './notification-dispatcher.service
 import { TriggerEvaluatorService } from './trigger-evaluator.service';
 import { CronService } from './cron.service';
 import { WhatsAppWebhookController } from './whatsapp.controller';
+import { AlignerService } from '../patients/aligner.service';
 
 @Module({
   imports: [PrismaModule, ScheduleModule.forRoot()],
@@ -19,6 +20,7 @@ import { WhatsAppWebhookController } from './whatsapp.controller';
     NotificationDispatcherService,
     TriggerEvaluatorService,
     CronService,
+    AlignerService,
   ],
   exports: [
     MessageTemplateService,

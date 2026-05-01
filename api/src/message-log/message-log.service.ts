@@ -7,15 +7,21 @@ export class MessageLogService {
 
   findAll() {
     return this.prisma.messageLog.findMany({
-      // Order by the most recent messages first
       orderBy: {
         createdAt: 'desc',
       },
-      // Include the related patient's data in the response
       include: {
         patient: {
           select: {
+            id: true,
             fullName: true,
+            avatarUrl: true,
+          },
+        },
+        template: {
+          select: {
+            name: true,
+            type: true,
           },
         },
       },

@@ -15,6 +15,8 @@ export interface Patient {
   wearDaysPerAligner?: number;
   batchStartDate?: string;
   trackingStartedAt?: string | null;
+  lastAlignerSetAt?: string | null;
+  lastAppointmentDate?: string | null;
   urgencyStatus?: 'ON_TRACK' | 'ENDING_SOON' | 'OVERDUE' | 'AWAITING_REEVALUATION';
   observations?: string;
   createdAt: string;
@@ -22,6 +24,8 @@ export interface Patient {
   clinicalRecords?: ClinicalRecord[];
   patientImages?: PatientImage[];
   pipelineStage?: 'REQUIRED_FILES' | 'IN_PRODUCTION' | 'READY_FOR_PICKUP' | 'IN_TREATMENT' | 'REEVALUATION' | 'ENDING_SOON' | null;
+  pipelineOverride?: string | null;
+  pipelineIsManual?: boolean;
   alignerBatches?: AlignerBatch[];
   reevaluations?: Reevaluation[];
   whatsappOptedIn?: boolean;

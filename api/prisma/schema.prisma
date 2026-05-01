@@ -24,9 +24,12 @@ model Patient {
   wearDaysPerAligner Int           @default(14)
   totalAligners      Int           @default(0)
   currentAligner     Int           @default(0) // 0 implies tracking hasn't started
+  lastAlignerSetAt   DateTime?     // Anchor date for cron scheduling; reset on every manual/auto aligner change
   trackingStartedAt  DateTime?
   batchPhase         Int           @default(1)
   batchStartDate     DateTime?
+  lastAppointmentDate DateTime?
+  pipelineOverride   String?       // null = auto-calculated; manual override: REQUIRED_FILES | IN_PRODUCTION | READY_FOR_PICKUP | IN_TREATMENT | ENDING_SOON | REEVALUATION
   status             PatientStatus @default(ACTIVE)
   avatarUrl          String?
   diagnosis          String?
@@ -221,6 +224,8 @@ enum MessageTemplateType {
   CHANGE_CONFIRMATION
   CHANGE_FOLLOWUP_NO
   FALLBACK_UNRECOGNIZED
+  BATCH_ENDING_LAB_ALERT
+  APPOINTMENT_NEEDED
 }
 
 model MessageTemplate {
