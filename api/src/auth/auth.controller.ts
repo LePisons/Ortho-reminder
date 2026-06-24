@@ -1,10 +1,20 @@
 import { Controller, Post, UseGuards, Request, Body, Get, Patch, Res } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { CreateUserDto } from '../users/dto/create-user.dto';
+import { Public } from './public.decorator';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
+
+// Auth cookie options. secure requires HTTPS, so it is only enabled in production.
+const authCookieOptions = {
+  httpOnly: true as const,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+};
+
+const BCRYPT_ROUNDS = 12;
 
 @Controller('auth')
 export class AuthController {
@@ -13,34 +23,22 @@ export class AuthController {
     private readonly usersService: UsersService,
   ) {}
 
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   async login(@Request() req, @Res({ passthrough: true }) res) {
     const { access_token, user } = await this.authService.login(req.user);
     res.cookie('access_token', access_token, {
-      httpOnly: true,
-      secure: false, // Set to true in production with HTTPS
-      sameSite: 'lax',
-      path: '/',
+      ...authCookieOptions,
       maxAge: 3600000, // 1 hour
     });
     return { user };
   }
 
-  @Post('register')
-  async register(@Body() createUserDto: CreateUserDto, @Res({ passthrough: true }) res) {
-    const { access_token, user } = await this.authService.register(createUserDto);
-    res.cookie('access_token', access_token, {
-      httpOnly: true,
-      secure: false, // Set to true in production with HTTPS
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 3600000, // 1 hour
-    });
-    return { user };
-  }
+  // Public self-registration is disabled. Accounts are provisioned via the seed
+  // script (see prisma/seed.ts) or an authenticated admin flow.
 
-  @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Request() req) {
     const user = await this.usersService.findOne(req.user.userId);
@@ -49,7 +47,6 @@ export class AuthController {
     return result;
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('profile')
   async updateProfile(@Request() req, @Body() body: { name?: string; email?: string; currentPassword?: string; newPassword?: string }) {
     const updateData: any = {};
@@ -60,21 +57,16 @@ export class AuthController {
       if (!user || !(await bcrypt.compare(body.currentPassword, user.password))) {
         return { error: 'Current password is incorrect' };
       }
-      updateData.password = await bcrypt.hash(body.newPassword, 10);
+      updateData.password = await bcrypt.hash(body.newPassword, BCRYPT_ROUNDS);
     }
-    const updated = await this.usersService.update(req.user.userId, updateData);
-    const { password, ...result } = updated;
-    return result;
+    // update() already returns a safe projection (no password hash).
+    return this.usersService.update(req.user.userId, updateData);
   }
 
+  @Public()
   @Post('logout')
   logout(@Res({ passthrough: true }) res) {
-    res.clearCookie('access_token', {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
-    });
+    res.clearCookie('access_token', authCookieOptions);
     return { message: 'Logged out' };
   }
 }

@@ -24,62 +24,62 @@ const stages = [
   {
     id: "REQUIRED_FILES",
     title: "Pending Files",
-    icon: AlertCircle,
-    gradient: "from-amber-500 to-orange-500",
-    bg: "bg-amber-50",
-    ring: "ring-amber-200",
-    textColor: "text-amber-700",
-    dotColor: "bg-amber-400",
+    subtitle: "Awaiting scan",
+    icon: Clock,
+    topBorder: "#C2810A",
+    iconBg: "#FBF1DC",
+    color: "#C2810A",
+    dotColor: "bg-[#C2810A]",
   },
   {
     id: "IN_PRODUCTION",
     title: "In Production",
-    icon: Clock,
-    gradient: "from-violet-500 to-purple-600",
-    bg: "bg-violet-50",
-    ring: "ring-violet-200",
-    textColor: "text-violet-700",
-    dotColor: "bg-violet-400",
+    subtitle: "Being made",
+    icon: Box,
+    topBorder: "#A066F8",
+    iconBg: "#F3EAFE",
+    color: "#8a44e8",
+    dotColor: "bg-[#8a44e8]",
   },
   {
     id: "READY_FOR_PICKUP",
     title: "Ready",
-    icon: Box,
-    gradient: "from-emerald-500 to-green-600",
-    bg: "bg-emerald-50",
-    ring: "ring-emerald-200",
-    textColor: "text-emerald-700",
-    dotColor: "bg-emerald-400",
+    subtitle: "To deliver",
+    icon: ShieldCheck,
+    topBorder: "#1F9254",
+    iconBg: "#E6F4EC",
+    color: "#1F9254",
+    dotColor: "bg-[#1F9254]",
   },
   {
     id: "IN_TREATMENT",
     title: "In Treatment",
+    subtitle: "Wearing now",
     icon: User,
-    gradient: "from-blue-500 to-cyan-600",
-    bg: "bg-blue-50",
-    ring: "ring-blue-200",
-    textColor: "text-blue-700",
-    dotColor: "bg-blue-400",
+    topBorder: "#6469FC",
+    iconBg: "#ECECFE",
+    color: "#5a5ff2",
+    dotColor: "bg-[#5a5ff2]",
   },
   {
     id: "ENDING_SOON",
     title: "Ending Soon",
+    subtitle: "Final stage",
     icon: AlertCircle,
-    gradient: "from-rose-500 to-red-600",
-    bg: "bg-rose-50",
-    ring: "ring-rose-200",
-    textColor: "text-rose-700",
-    dotColor: "bg-rose-400",
+    topBorder: "#D6443B",
+    iconBg: "#FBE9E9",
+    color: "#D6443B",
+    dotColor: "bg-[#D6443B]",
   },
   {
     id: "REEVALUATION",
-    title: "Re-eval",
+    title: "Re-Eval",
+    subtitle: "Needs review",
     icon: ShieldCheck,
-    gradient: "from-teal-500 to-cyan-600",
-    bg: "bg-teal-50",
-    ring: "ring-teal-200",
-    textColor: "text-teal-700",
-    dotColor: "bg-teal-400",
+    topBorder: "#0E9AA0",
+    iconBg: "#E2F4F4",
+    color: "#0E9AA0",
+    dotColor: "bg-[#0E9AA0]",
   },
 ];
 
@@ -87,7 +87,7 @@ export function PipelineOverview({ data }: { data: PipelineData | null }) {
   if (!data) return null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
       {stages.map((stage) => {
         const patients = data[stage.id as keyof PipelineData] || [];
         const Icon = stage.icon;
@@ -97,63 +97,54 @@ export function PipelineOverview({ data }: { data: PipelineData | null }) {
           <Link
             key={stage.id}
             href="/pipeline"
-            className={`group relative rounded-2xl border ${stage.bg} ring-1 ${stage.ring} p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5 cursor-pointer overflow-hidden`}
+            style={{ borderTopColor: stage.topBorder }}
+            className="group bg-white border border-[#EBE7DE] border-t-[3px] rounded-2xl p-4 flex flex-col gap-3.5 shadow-[0_1px_2px_rgba(27,27,27,0.04)] transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
           >
-            {/* Decorative gradient bar */}
-            <div
-              className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${stage.gradient} opacity-80`}
-            />
-
             {/* Header with icon + count */}
-            <div className="flex items-center justify-between mb-3 mt-1">
+            <div className="flex items-center justify-between">
               <div
-                className={`w-8 h-8 rounded-xl bg-gradient-to-br ${stage.gradient} flex items-center justify-center shadow-sm`}
+                className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center"
+                style={{ backgroundColor: stage.iconBg, color: stage.color }}
               >
-                <Icon className="w-4 h-4 text-white" />
+                <Icon className="w-[17px] h-[17px]" />
               </div>
               <span
-                className={`text-2xl font-black ${stage.textColor} tracking-tight`}
+                className="text-[28px] font-extrabold leading-none tracking-tight"
+                style={{ color: stage.color }}
               >
                 {count}
               </span>
             </div>
 
-            {/* Stage name */}
-            <p
-              className={`text-xs font-bold ${stage.textColor} mb-2.5 tracking-wide uppercase`}
-            >
-              {stage.title}
-            </p>
-
-            {/* Top 3 patient names */}
-            <div className="space-y-1">
-              {patients.slice(0, 3).map((patient) => (
-                <div
-                  key={patient.id}
-                  className="flex items-center gap-1.5"
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${stage.dotColor} shrink-0`}
-                  />
-                  <span className="text-[11px] text-gray-600 truncate font-medium">
-                    {patient.fullName.split(" ")[0]}{" "}
-                    {patient.fullName.split(" ")[1]?.[0]
-                      ? patient.fullName.split(" ")[1][0] + "."
-                      : ""}
-                  </span>
-                </div>
-              ))}
-              {count > 3 && (
-                <p className="text-[10px] text-gray-400 font-medium pl-3">
-                  +{count - 3} more
-                </p>
-              )}
-              {count === 0 && (
-                <p className="text-[10px] text-gray-400 italic">
-                  No patients
-                </p>
-              )}
+            {/* Stage name + subtitle */}
+            <div>
+              <p className="text-[13px] font-bold text-[#1B1B1B]">{stage.title}</p>
+              <p className="text-[11.5px] text-[#9a9aa2] mt-0.5">{stage.subtitle}</p>
             </div>
+
+            {/* Top patient names */}
+            {count > 0 && (
+              <div className="space-y-1 pt-1 border-t border-[#F4F1EA]">
+                {patients.slice(0, 3).map((patient) => (
+                  <div key={patient.id} className="flex items-center gap-1.5">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${stage.dotColor} shrink-0`}
+                    />
+                    <span className="text-[11px] text-[#6b6b73] truncate font-medium">
+                      {patient.fullName.split(" ")[0]}{" "}
+                      {patient.fullName.split(" ")[1]?.[0]
+                        ? patient.fullName.split(" ")[1][0] + "."
+                        : ""}
+                    </span>
+                  </div>
+                ))}
+                {count > 3 && (
+                  <p className="text-[10px] text-[#9a9aa2] font-medium pl-3">
+                    +{count - 3} more
+                  </p>
+                )}
+              </div>
+            )}
           </Link>
         );
       })}

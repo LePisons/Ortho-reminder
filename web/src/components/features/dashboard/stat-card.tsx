@@ -15,34 +15,24 @@ interface StatCardProps {
 
 const variantStyles = {
   primary: {
-    bg: "bg-gradient-to-br from-emerald-50 to-green-50",
-    iconBg: "bg-gradient-to-br from-emerald-500 to-green-600",
-    text: "text-emerald-700",
-    border: "border-emerald-100",
+    iconBg: "bg-gradient-to-br from-[#A066F8] to-[#6469FC] text-white",
+    accent: "text-[#1F9254]",
   },
   danger: {
-    bg: "bg-gradient-to-br from-rose-50 to-red-50",
-    iconBg: "bg-gradient-to-br from-rose-500 to-red-600",
-    text: "text-rose-700",
-    border: "border-rose-100",
+    iconBg: "bg-[#FBE9E9] text-[#D6443B]",
+    accent: "text-[#D6443B]",
   },
   warning: {
-    bg: "bg-gradient-to-br from-amber-50 to-orange-50",
-    iconBg: "bg-gradient-to-br from-amber-500 to-orange-500",
-    text: "text-amber-700",
-    border: "border-amber-100",
+    iconBg: "bg-[#FBF1DC] text-[#C2810A]",
+    accent: "text-[#9c8a6e]",
   },
   success: {
-    bg: "bg-gradient-to-br from-sky-50 to-blue-50",
-    iconBg: "bg-gradient-to-br from-sky-500 to-blue-600",
-    text: "text-sky-700",
-    border: "border-sky-100",
+    iconBg: "bg-[#E6F4EC] text-[#1F9254]",
+    accent: "text-[#9d9da6]",
   },
   default: {
-    bg: "bg-white",
-    iconBg: "bg-gradient-to-br from-gray-400 to-gray-500",
-    text: "text-gray-700",
-    border: "border-gray-100",
+    iconBg: "bg-[#F3EAFE] text-[#8a44e8]",
+    accent: "text-[#9d9da6]",
   },
 };
 
@@ -57,40 +47,36 @@ export function StatCard({
   const style = variantStyles[variant];
 
   return (
-    <div
-      className={`${style.bg} p-5 rounded-2xl shadow-sm border ${style.border} transition-all hover:shadow-md flex items-center justify-between group`}
-    >
-      <div>
-        <h3 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+    <div className="bg-white border border-[#EBE7DE] rounded-[18px] p-5 flex flex-col gap-4 shadow-[0_1px_2px_rgba(27,27,27,0.04)] transition-all hover:shadow-md">
+      <div className="flex items-start justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-[#8a8a93]">
           {title}
-        </h3>
-        <p className={`text-3xl font-black ${style.text} tracking-tight`}>
-          {value}
-        </p>
-
-        {trend && (
-          <div className="flex items-center text-xs mt-1.5 font-medium text-gray-400">
-            <span>
-              {trend.isPositive ? "+" : ""}
-              {trend.value}
-            </span>
-            <span className="ml-1.5">{trend.label}</span>
+        </span>
+        {icon && (
+          <div
+            className={`w-10 h-10 rounded-xl ${style.iconBg} flex items-center justify-center shrink-0`}
+          >
+            {icon}
           </div>
         )}
+      </div>
 
-        {description && (
-          <p className="text-xs text-gray-400 mt-1 font-medium">
+      <div className="flex items-baseline gap-2.5">
+        <span className="text-[38px] font-extrabold leading-none tracking-tight text-[#1B1B1B]">
+          {value}
+        </span>
+        {trend && (
+          <span className={`text-xs font-semibold ${style.accent}`}>
+            {trend.isPositive ? "+" : ""}
+            {trend.value} {trend.label}
+          </span>
+        )}
+        {!trend && description && (
+          <span className={`text-xs font-semibold ${style.accent}`}>
             {description}
-          </p>
+          </span>
         )}
       </div>
-      {icon && (
-        <div
-          className={`w-11 h-11 rounded-xl ${style.iconBg} flex items-center justify-center text-white shrink-0 shadow-sm group-hover:scale-105 transition-transform`}
-        >
-          {icon}
-        </div>
-      )}
     </div>
   );
 }

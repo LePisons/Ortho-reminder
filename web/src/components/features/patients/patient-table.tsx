@@ -75,13 +75,14 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
     <>
       <Table>
         <TableCaption>Latest Patients</TableCaption>
-        <TableHeader className="bg-gray-50/50">
-          <TableRow className="hover:bg-transparent border-gray-100">
+        <TableHeader className="bg-[#FAF9F5]">
+          <TableRow className="hover:bg-transparent border-[#F0EDE6]">
             <TableHead className="text-xs uppercase tracking-wider text-gray-800 font-bold">Full Name</TableHead>
             <TableHead className="text-xs uppercase tracking-wider text-gray-800 font-bold">RUT</TableHead>
             <TableHead className="text-xs uppercase tracking-wider text-gray-800 font-bold">Phone</TableHead>
             <TableHead className="text-xs uppercase tracking-wider text-gray-800 font-bold">Status</TableHead>
             <TableHead className="text-xs uppercase tracking-wider text-gray-800 font-bold">Start Date</TableHead>
+            <TableHead className="text-xs uppercase tracking-wider text-gray-800 font-bold">Aligner</TableHead>
             <TableHead className="text-right text-xs uppercase tracking-wider text-gray-800 font-bold">Urgency Status</TableHead>
             <TableHead className="text-right text-xs uppercase tracking-wider text-gray-800 font-bold">Actions</TableHead>
           </TableRow>
@@ -90,8 +91,8 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
           {patients.map((patient) => (
             <TableRow key={patient.id} className="hover:bg-gray-50/50 transition-colors border-gray-100">
               <TableCell className="font-medium">
-                <Link href={`/patients/${patient.id}`} className="hover:text-[#254F22] hover:underline hover:underline-offset-4 text-gray-900 transition-all font-bold group flex items-center gap-1">
-                  {patient.fullName} <span className="text-transparent group-hover:text-[#254F22] transition-colors">→</span>
+                <Link href={`/patients/${patient.id}`} className="hover:text-[#6469FC] hover:underline hover:underline-offset-4 text-gray-900 transition-all font-bold group flex items-center gap-1">
+                  {patient.fullName} <span className="text-transparent group-hover:text-[#6469FC] transition-colors">→</span>
                 </Link>
               </TableCell>
               <TableCell>{patient.rut}</TableCell>
@@ -111,6 +112,20 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
               </TableCell>
               <TableCell>
                 {new Date(patient.treatmentStartDate).toLocaleDateString()}
+              </TableCell>
+              <TableCell>
+                {patient.currentAligner > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-sm font-semibold text-gray-800">
+                    <span className="bg-[#ECECFE] text-[#5a5ff2] rounded-md px-2 py-0.5 text-xs font-bold">
+                      {patient.currentAligner}
+                    </span>
+                    {patient.totalAligners > 0 && (
+                      <span className="text-gray-400 text-xs">/ {patient.totalAligners}</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-300 text-sm">—</span>
+                )}
               </TableCell>
               <TableCell className="text-right">
                 {patient.urgencyStatus ? (

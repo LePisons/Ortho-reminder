@@ -2,12 +2,22 @@ import { Controller, Get, Post, Req, Res, Logger, HttpStatus } from '@nestjs/com
 import { Request, Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { MessageStatus } from '@prisma/client';
+import { AlignerService } from '../patients/aligner.service';
+import { WhatsAppProvider } from './providers/whatsapp.provider';
+import { Public } from '../auth/public.decorator';
 
+// Meta calls these endpoints server-to-server; they are authenticated by the
+// hub.verify_token handshake / signature, not by a user session.
+@Public()
 @Controller('webhooks/whatsapp')
 export class WhatsAppWebhookController {
   private readonly logger = new Logger(WhatsAppWebhookController.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly alignerService: AlignerService,
+    private readonly whatsappProvider: WhatsAppProvider,
+  ) {}
 
   /**
    * The webhook Verification Endpoint.
@@ -83,12 +93,78 @@ export class WhatsAppWebhookController {
           if (value.messages && value.messages.length > 0) {
             for (const message of value.messages) {
               const fromPhone = message.from; // Phone number
-              const messageText = message.text?.body;
+              const messageText = message.text?.body || message.button?.text || message.interactive?.button_reply?.title;
+              const metaId = message.id;
               
               if (messageText) {
                 this.logger.log(`Incoming reply from ${fromPhone}: ${messageText}`);
                 
-                // TODO: Save to patient's message history if needed
+                // Try to match patient by phone (fromPhone usually is like "569XXXXXXXX")
+                // We'll strip non-digits from DB phones to match safely or do a contains search
+                const possiblePatients = await this.prisma.patient.findMany({
+                  where: {
+                    phone: {
+                      contains: fromPhone.substring(Math.max(0, fromPhone.length - 8))
+                    }
+                  }
+                });
+
+                const patient = possiblePatients[0]; // best effort match
+
+                if (patient) {
+                  await this.prisma.messageLog.create({
+                    data: {
+                      patientId: patient.id,
+                      channel: 'WHATSAPP',
+                      direction: 'INCOMING',
+                      recipient: fromPhone,
+                      content: messageText,
+                      status: 'DELIVERED',
+                      isRead: false,
+                      triggeredBy: 'webhook',
+                      providerMessageId: metaId
+                    }
+                  });
+                  this.logger.log(`Saved incoming message to patient ${patient.id}`);
+
+                  // Automated Reply Logic
+                  const textLower = messageText.toLowerCase();
+
+                  if (textLower.includes('ya lo cambié')) {
+                    const nextAligner = patient.currentAligner + 1;
+                    await this.alignerService.setCurrentAligner(patient.id, nextAligner, new Date(), 'patient_reply');
+                    await this.whatsappProvider.send(fromPhone, '¡Excelente! 🎉 Sigue así. He registrado tu cambio en el sistema. Nos hablamos en tu próximo recambio.');
+                  } 
+                  else if (textLower.includes('faltan días') || textLower.includes('faltan dias')) {
+                    const wearDays = patient.wearDaysPerAligner || 14;
+                    const lastSet = patient.lastAlignerSetAt ? new Date(patient.lastAlignerSetAt) : new Date();
+                    const nextChangeDate = new Date(lastSet.getTime() + wearDays * 24 * 60 * 60 * 1000);
+                    const now = new Date();
+                    
+                    // Set both to midnight to avoid partial day issues
+                    const nextDateMidnight = new Date(nextChangeDate.getFullYear(), nextChangeDate.getMonth(), nextChangeDate.getDate());
+                    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    
+                    const diffTime = nextDateMidnight.getTime() - nowMidnight.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    if (diffDays <= 0) {
+                      await this.whatsappProvider.send(fromPhone, 'Según nuestros registros, ¡hoy te toca tu cambio! 🦷 Te sugiero realizarlo lo antes posible.');
+                    } else {
+                      await this.whatsappProvider.send(fromPhone, `¡Entendido! Te faltan ${diffDays} días para tu próximo cambio (estimado para el ${nextChangeDate.toLocaleDateString('es-CL')}). ¡Ánimo! 💪`);
+                    }
+                  }
+                  else if (textLower.includes('alineador')) {
+                    const wearDays = patient.wearDaysPerAligner || 14;
+                    const lastSet = patient.lastAlignerSetAt ? new Date(patient.lastAlignerSetAt) : new Date();
+                    const nextChangeDate = new Date(lastSet.getTime() + wearDays * 24 * 60 * 60 * 1000);
+                    
+                    await this.whatsappProvider.send(fromPhone, `Según nuestros registros, actualmente vas en el alineador ${patient.currentAligner}. Tu próximo cambio estimado es el ${nextChangeDate.toLocaleDateString('es-CL')}.`);
+                  }
+
+                } else {
+                  this.logger.warn(`Could not find patient matching phone ${fromPhone} to attach incoming message.`);
+                }
               }
             }
           }

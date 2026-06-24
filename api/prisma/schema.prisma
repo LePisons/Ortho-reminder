@@ -13,12 +13,39 @@ enum PatientStatus {
   FINISHED
 }
 
+enum PipelineStage {
+  REQUIRED_FILES
+  IN_PRODUCTION
+  READY_FOR_PICKUP
+  IN_TREATMENT
+  ENDING_SOON
+  REEVALUATION
+}
+
+// Lowercase members deliberately match the string values already written by the
+// app and present in historical rows, so the text->enum migration casts cleanly.
+enum MessageTrigger {
+  cron
+  manual
+  webhook
+  telegram_bot
+}
+
+enum AlignerChangeReason {
+  manual_adjustment
+  manual_start
+  onboarding
+  auto_onboarding
+  cron
+  patient_reply
+}
+
 model Patient {
   id                 String        @id @default(cuid())
-  rut                String        @unique
+  rut                String
   fullName           String
-  phone              String        @unique
-  email              String        @unique
+  phone              String
+  email              String
   treatmentStartDate DateTime
   changeFrequency    Int
   wearDaysPerAligner Int           @default(14)
@@ -29,7 +56,7 @@ model Patient {
   batchPhase         Int           @default(1)
   batchStartDate     DateTime?
   lastAppointmentDate DateTime?
-  pipelineOverride   String?       // null = auto-calculated; manual override: REQUIRED_FILES | IN_PRODUCTION | READY_FOR_PICKUP | IN_TREATMENT | ENDING_SOON | REEVALUATION
+  pipelineOverride   PipelineStage? // null = auto-calculated; otherwise a manual stage override
   status             PatientStatus @default(ACTIVE)
   avatarUrl          String?
   diagnosis          String?
@@ -37,6 +64,7 @@ model Patient {
   observations       String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?     // soft delete; non-null rows are hidden from queries
   whatsappOptedIn    Boolean       @default(false)
   whatsappOptedInAt  DateTime?
 
@@ -52,6 +80,11 @@ model Patient {
   alignerChangeEvents AlignerChangeEvent[]
   appointmentRecords  AppointmentRecord[]
   onboardingToken     OnboardingToken?
+
+  @@unique([userId, rut])
+  @@unique([userId, email])
+  @@unique([userId, phone])
+  @@index([userId])
 }
 
 model ClinicalRecord {
@@ -63,6 +96,8 @@ model ClinicalRecord {
 
   patientId String
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
 }
 
 enum ImageType {
@@ -80,6 +115,8 @@ model PatientImage {
 
   patientId String
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
 }
 
 model Note {
@@ -91,6 +128,8 @@ model Note {
 
   patientId String?
   patient   Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
 }
 
 enum AppointmentStatus {
@@ -115,15 +154,23 @@ model Appointment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([patientId])
 }
 
 // MessageLog replaced by the new version at the bottom
+
+enum Role {
+  ADMIN
+  STAFF
+}
 
 model User {
   id        String    @id @default(cuid())
   email     String    @unique
   password  String
   name      String?
+  role      Role      @default(STAFF)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   patients  Patient[]
@@ -159,6 +206,8 @@ model AlignerBatch {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([patientId])
 }
 
 model BatchEvent {
@@ -171,6 +220,8 @@ model BatchEvent {
   createdBy  String?
 
   createdAt DateTime @default(now())
+
+  @@index([batchId])
 }
 
 enum ReevaluationStatus {
@@ -193,6 +244,8 @@ model Reevaluation {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([patientId])
 }
 
 enum MessageChannel {
@@ -241,21 +294,31 @@ model MessageTemplate {
   logs      MessageLog[]
 }
 
+enum MessageDirection {
+  INCOMING
+  OUTGOING
+}
+
 model MessageLog {
-  id           String           @id @default(cuid())
-  patientId    String?
-  templateId   String?
-  template     MessageTemplate? @relation(fields: [templateId], references: [id])
-  channel      MessageChannel
-  recipient    String
-  content      String
+  id                String           @id @default(cuid())
+  patientId         String?
+  templateId        String?
+  template          MessageTemplate? @relation(fields: [templateId], references: [id])
+  channel           MessageChannel
+  direction         MessageDirection @default(OUTGOING)
+  recipient         String
+  content           String
   status            MessageStatus    @default(PENDING)
   error             String?
   providerMessageId String?          @unique
-  triggeredBy  String           // "cron" | "manual" | "telegram_bot"
-  createdAt    DateTime         @default(now())
+  isRead            Boolean          @default(true)
+  triggeredBy       MessageTrigger
+  createdAt         DateTime         @default(now())
 
-  patient      Patient?         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient           Patient?         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([templateId])
 }
 
 model AlignerChangeEvent {
@@ -264,9 +327,11 @@ model AlignerChangeEvent {
   patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   alignerNumber  Int
   confirmedAt    DateTime?
-  confirmedBy    String?   // "bot_reply" | "manual" | "auto"
+  confirmedBy    AlignerChangeReason?
   nextReminderAt DateTime
   createdAt      DateTime @default(now())
+
+  @@index([patientId])
 }
 
 model AppointmentRecord {
@@ -278,6 +343,21 @@ model AppointmentRecord {
   startingAligner  Int
   nextApptEstimate DateTime?
   createdAt        DateTime  @default(now())
+
+  @@index([patientId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String? // userId of the acting user; null for system/cron actions
+  action    String // CREATE | UPDATE | DELETE
+  entity    String // e.g. "Patient", "ClinicalRecord"
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId])
 }
 
 model Setting {
@@ -294,4 +374,13 @@ model OnboardingToken {
   usedAt      DateTime?
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
+}
+
+// Roster of Dentalink patients surfaced on the Controles page. `id` is the
+// Dentalink patient ID (not a local cuid) so it maps directly to their API.
+// Seeded once from the DENTALINK_PATIENT_IDS env var, then editable at runtime.
+model DentalinkPatient {
+  id        Int      @id
+  nombre    String
+  createdAt DateTime @default(now())
 }

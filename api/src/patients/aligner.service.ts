@@ -5,7 +5,8 @@ export type AlignerChangeReason =
   | 'manual_adjustment'
   | 'manual_start'
   | 'onboarding'
-  | 'cron';
+  | 'cron'
+  | 'patient_reply';
 
 @Injectable()
 export class AlignerService {

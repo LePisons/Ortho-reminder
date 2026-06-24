@@ -40,8 +40,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Left split - Image Background */}
-      <div 
-        className="hidden lg:block lg:flex-1 bg-cover bg-center bg-no-repeat relative bg-[#8b5cf6]"
+      <div
+        className="hidden lg:block lg:flex-1 bg-cover bg-center bg-no-repeat relative bg-gradient-to-br from-[#A066F8] to-[#6469FC]"
         style={{ backgroundImage: "url('/Login/Login.png')" }}
       >
         <div className="absolute inset-0 bg-black/5 mix-blend-overlay" />
@@ -49,15 +49,21 @@ export default function LoginPage() {
 
       {/* Right split - Form */}
       <div className="flex flex-1 flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 bg-white relative">
-        
+
         {/* Decorative Welcome Pill */}
-        <div className="absolute top-12 left-0 inline-flex items-center rounded-r-full bg-[#8b5cf6] px-8 py-3 text-lg font-medium text-white shadow-md">
+        <div className="absolute top-12 left-0 inline-flex items-center rounded-r-full bg-gradient-to-br from-[#A066F8] to-[#6469FC] px-8 py-3 text-lg font-medium text-white shadow-md">
           Welcome back
         </div>
 
         <div className="mx-auto w-full max-w-sm lg:w-[400px] mt-16 lg:mt-0">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-gray-700 text-center mb-10">
+          <div className="flex flex-col items-center mb-10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-[38px] h-[38px] rounded-[11px] bg-gradient-to-br from-[#A066F8] to-[#6469FC] flex items-center justify-center shadow-[0_4px_14px_rgba(100,105,252,0.45)]">
+                <span className="text-white text-xl font-extrabold italic">X</span>
+              </div>
+              <span className="text-[21px] font-extrabold tracking-[0.14em] text-[#1B1B1B]">ALNIX</span>
+            </div>
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-700 text-center">
               Login your account
             </h2>
           </div>
@@ -77,7 +83,7 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full border-0 border-b-2 border-gray-300 bg-transparent py-2 text-gray-900 focus:border-[#8b5cf6] focus:outline-none focus:ring-0 sm:text-sm transition-colors"
+                    className="block w-full border-0 border-b-2 border-gray-300 bg-transparent py-2 text-gray-900 focus:border-[#6469FC] focus:outline-none focus:ring-0 sm:text-sm transition-colors"
                     required
                   />
                 </div>
@@ -90,7 +96,7 @@ export default function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full border-0 border-b-2 border-gray-300 bg-transparent py-2 text-gray-900 focus:border-[#8b5cf6] focus:outline-none focus:ring-0 sm:text-sm transition-colors"
+                    className="block w-full border-0 border-b-2 border-gray-300 bg-transparent py-2 text-gray-900 focus:border-[#6469FC] focus:outline-none focus:ring-0 sm:text-sm transition-colors"
                     required
                   />
                 </div>
@@ -100,19 +106,13 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full md:w-48 mx-auto justify-center rounded-3xl bg-[#a78bfa] px-8 py-3 text-md font-bold text-white shadow-lg shadow-[#a78bfa]/30 hover:bg-[#8b5cf6] hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b5cf6] transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none"
+                  className="w-full md:w-48 mx-auto justify-center rounded-3xl bg-gradient-to-br from-[#A066F8] to-[#6469FC] px-8 py-3 text-md font-bold text-white shadow-lg shadow-[#6469FC]/30 hover:brightness-105 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6469FC] transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none"
                 >
                   {isLoading ? 'Logging in...' : 'Login'}
                 </button>
 
-                <div className="text-xs font-semibold text-gray-500">
-                  <Link href="/register" className="hover:text-[#8b5cf6] transition-colors">
-                    Create Account
-                  </Link>
-                </div>
-                
                 <div className="pt-4 border-b border-gray-700 w-32 flex justify-center pb-1">
-                  <Link href="/forgot-password" className="text-xs font-semibold text-gray-600 hover:text-[#8b5cf6] transition-colors">
+                  <Link href="/forgot-password" className="text-xs font-semibold text-gray-600 hover:text-[#6469FC] transition-colors">
                     Forgot Password?
                   </Link>
                 </div>

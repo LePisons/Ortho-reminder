@@ -187,8 +187,8 @@ export default function PipelinePage() {
   return (
     <div className="space-y-6 h-full flex flex-col">
       <div className="flex items-center justify-between shrink-0">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Lab Pipeline</h1>
-        <p className="text-gray-500 text-sm">Track active lab orders and aligner endpoints</p>
+        <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B]">Lab Pipeline</h1>
+        <p className="text-[#7c7c84] text-sm">Track active lab orders and aligner endpoints</p>
       </div>
 
       <div className="flex gap-6 h-[calc(100vh-180px)] overflow-hidden">

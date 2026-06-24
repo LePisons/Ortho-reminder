@@ -1,9 +1,37 @@
 import { PrismaClient, MessageChannel, MessageTemplateType } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+async function seedBootstrapAdmin() {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL;
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.log(
+      'Skipping admin bootstrap (set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD to create the first user).',
+    );
+    return;
+  }
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    console.log(`Admin user ${email} already exists; leaving it unchanged.`);
+    return;
+  }
+  await prisma.user.create({
+    data: {
+      email,
+      name: process.env.BOOTSTRAP_ADMIN_NAME || 'Admin',
+      password: await bcrypt.hash(password, 12),
+      role: 'ADMIN',
+    },
+  });
+  console.log(`Created bootstrap admin user: ${email}`);
+}
+
 async function main() {
   console.log('Start seeding...');
+
+  await seedBootstrapAdmin();
 
   // 1. Seed Settings
   const settings = [

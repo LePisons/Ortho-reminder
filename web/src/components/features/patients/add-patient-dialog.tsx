@@ -1,5 +1,6 @@
 "use client";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
 import { API_URL } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -120,7 +121,11 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" onClick={() => setIsOpen(true)}>
+        <Button
+          onClick={() => setIsOpen(true)}
+          className="gap-2 rounded-xl bg-gradient-to-br from-[#A066F8] to-[#6469FC] px-5 py-[13px] h-auto text-[13.5px] font-bold text-white shadow-[0_8px_22px_rgba(100,105,252,0.38)] hover:brightness-105 hover:shadow-[0_10px_26px_rgba(100,105,252,0.5)]"
+        >
+          <Plus className="w-4 h-4" strokeWidth={2.4} />
           Add New Patient
         </Button>
       </DialogTrigger>
@@ -134,7 +139,18 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
 
         {/* THIS IS THE NEW FORM */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              // Non-invasive notification when validation blocks submission.
+              if (errors.totalAligners) {
+                toast.warning("Total aligners required", {
+                  description:
+                    "Set a total aligner count of at least 1 before creating the patient.",
+                });
+              }
+            })}
+            className="space-y-4"
+          >
             <FormField
               control={form.control}
               name="fullName"
@@ -231,12 +247,20 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
             <FormField
               control={form.control}
               name="totalAligners"
+              rules={{
+                required: "Total aligners is required.",
+                min: {
+                  value: 1,
+                  message: "Total aligners must be at least 1 to start treatment.",
+                },
+              }}
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Total Aligners</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
+                      min={1}
                       {...field}
                       onChange={(event) => field.onChange(+event.target.value)}
                     />

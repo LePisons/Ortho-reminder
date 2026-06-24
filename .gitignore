@@ -130,3 +130,6 @@ dist
 
 # Info para mi
 comandos.txt
+
+# Local scratch / generated reports (may contain patient PII — never commit)
+/outputs/

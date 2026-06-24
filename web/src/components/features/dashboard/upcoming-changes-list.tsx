@@ -42,7 +42,7 @@ export function UpcomingChangesList({
               className="group flex flex-col md:flex-row md:items-center justify-between p-4 -mx-4 rounded-xl hover:bg-white transition-all border border-transparent hover:border-gray-100 hover:shadow-sm"
             >
               <div className="flex-1">
-                <p className="font-bold text-gray-900 group-hover:text-[#254F22] transition-colors">{patient.fullName}</p>
+                <p className="font-bold text-gray-900 group-hover:text-[#6469FC] transition-colors">{patient.fullName}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-600 ring-1 ring-inset ring-gray-500/10 uppercase tracking-wide">
                     Aligner #{patient.currentAligner}
@@ -60,8 +60,8 @@ export function UpcomingChangesList({
                     {new Date(patient.nextChangeDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </p>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-gray-50 group-hover:bg-[#254F22]/10 flex items-center justify-center transition-colors">
-                   <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#254F22]" />
+                <div className="w-8 h-8 rounded-full bg-gray-50 group-hover:bg-[#ECECFE] flex items-center justify-center transition-colors">
+                   <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#6469FC]" />
                 </div>
               </div>
             </Link>

@@ -1,42 +1,58 @@
 // In api/src/main.ts
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import helmet from 'helmet';
+import { validateEnv } from './config/env.validation';
 
 async function bootstrap() {
+  validateEnv();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.enableShutdownHooks();
+  const isProd = process.env.NODE_ENV === 'production';
+
+  app.use(helmet());
   app.use(cookieParser());
+
+  // Strip properties not declared on the DTO (prevents mass-assignment) and run
+  // the class-validator decorators. We strip rather than 400 on extra fields to
+  // stay tolerant of the existing frontend payloads.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
+
+  // Env-driven CORS allowlist. ALLOWED_ORIGINS is a comma-separated list.
+  // localhost is only permitted outside production for local dev.
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: function (origin, callback) {
-      if (!origin || origin === 'http://localhost:3000' || (origin && origin.endsWith('.ngrok-free.app'))) {
-        callback(null, true);
-      } else if (process.env.ALLOWED_ORIGIN && origin === process.env.ALLOWED_ORIGIN) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+    origin: (origin, callback) => {
+      if (!origin) {
+        // Same-origin / server-to-server / curl — no Origin header.
+        return callback(null, true);
       }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      if (!isProd && origin === 'http://localhost:3000') {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
   });
 
-  // Ensure uploads directory exists
-  const uploadsDir = join(process.cwd(), 'uploads', 'patient-images');
-  const avatarsDir = join(process.cwd(), 'uploads', 'avatars');
-  
-  if (!existsSync(uploadsDir)) {
-    mkdirSync(uploadsDir, { recursive: true });
-  }
-  if (!existsSync(avatarsDir)) {
-    mkdirSync(avatarsDir, { recursive: true });
-  }
-
-  // Serve uploaded files as static assets
-  app.useStaticAssets(join(process.cwd(), 'uploads'), {
-    prefix: '/uploads/',
-  });
+  // Patient images and avatars are stored privately in R2 and served via
+  // short-lived signed URLs — no public static file serving.
 
   await app.listen(3001);
 }

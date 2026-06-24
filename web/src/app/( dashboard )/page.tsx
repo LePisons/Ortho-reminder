@@ -117,12 +117,12 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-start gap-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B]">
             Dashboard
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-sm text-[#7c7c84] mt-1.5">
             Your practice at a glance
           </p>
         </div>
@@ -130,38 +130,42 @@ export default function HomePage() {
       </div>
 
       {/* Summary strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
         <StatCard
           title="Active Patients"
           value={stats.active}
           icon={<Users className="w-5 h-5" />}
           variant="primary"
+          description="Currently in care"
         />
         <StatCard
           title="Needs Attention"
           value={urgentCount}
           icon={<AlertTriangle className="w-5 h-5" />}
           variant="danger"
+          description="Requires action"
         />
         <StatCard
           title="Paused"
           value={stats.paused}
           icon={<PauseCircle className="w-5 h-5" />}
           variant="warning"
+          description="On hold"
         />
         <StatCard
           title="Completed"
           value={stats.finished}
           icon={<CheckCircle2 className="w-5 h-5" />}
           variant="success"
+          description="All time"
         />
       </div>
 
       {/* Pipeline Overview */}
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Activity className="w-4 h-4 text-gray-400" />
-          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+        <div className="flex items-center gap-2 mb-3.5">
+          <Activity className="w-[17px] h-[17px] text-[#6469FC]" />
+          <h2 className="text-xs font-bold text-[#6b6b73] uppercase tracking-[0.09em]">
             Patient Pipeline
           </h2>
         </div>
@@ -169,17 +173,20 @@ export default function HomePage() {
       </div>
 
       {/* Main Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-[22px] items-start">
         {/* Patient List */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-          <div className="flex justify-between items-center p-6 border-b border-gray-100">
-            <h2 className="text-lg font-bold">Patient List</h2>
+        <div className="lg:col-span-2 bg-white rounded-[18px] shadow-[0_1px_2px_rgba(27,27,27,0.04)] border border-[#EBE7DE] overflow-hidden flex flex-col">
+          <div className="flex justify-between items-start px-6 pt-5 pb-4">
+            <div>
+              <h2 className="text-[17px] font-extrabold text-[#1B1B1B]">Patient List</h2>
+              <p className="text-[12.5px] text-[#9a9aa2] mt-1">Latest patients</p>
+            </div>
           </div>
           <div className="p-0 overflow-x-auto">
             <PatientTable patients={patients} onDataChange={handleDataChange} />
           </div>
           {totalPages > 1 && (
-            <div className="p-4 border-t border-gray-100 bg-gray-50/30">
+            <div className="p-4 border-t border-[#F0EDE6] bg-[#FAF9F5]">
               <PaginationControls
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -190,18 +197,15 @@ export default function HomePage() {
         </div>
 
         {/* Upcoming Changes */}
-        <div className="space-y-6 bg-gray-50/50 rounded-2xl p-6 border border-gray-100/50 h-fit">
-          <div>
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-              Upcoming Changes
-            </h2>
-            <UpcomingChangesList
-              patients={upcoming}
-              currentPage={upcomingPage}
-              totalPages={upcomingTotalPages}
-              onPageChange={handleUpcomingPageChange}
-            />
-          </div>
+        <div className="bg-white rounded-[18px] p-6 border border-[#EBE7DE] shadow-[0_1px_2px_rgba(27,27,27,0.04)] h-fit">
+          <h2 className="text-[17px] font-extrabold text-[#1B1B1B]">Upcoming Changes</h2>
+          <p className="text-[12.5px] text-[#9a9aa2] mt-1 mb-4">Next 14 days</p>
+          <UpcomingChangesList
+            patients={upcoming}
+            currentPage={upcomingPage}
+            totalPages={upcomingTotalPages}
+            onPageChange={handleUpcomingPageChange}
+          />
         </div>
       </div>
     </div>

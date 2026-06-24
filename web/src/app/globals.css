@@ -41,6 +41,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Alnix brand palette */
+  --color-brand-purple: #A066F8;
+  --color-brand-blue: #6469FC;
+  --color-brand-blue-strong: #5a5ff2;
+  --color-ink: #1B1B1B;
+  --color-canvas: #F4F2EC;
+  --color-card-line: #EBE7DE;
   /* Pixel Art Theme */
   --font-pixel: var(--font-pixel);
   --color-pixel-dark-green: #254F22;
@@ -50,25 +57,25 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: #2b5c27; /* Forest Green */
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: #2b5c27;
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --radius: 0.75rem;
+  --background: #F4F2EC; /* Warm cream canvas */
+  --foreground: #1B1B1B; /* Ink */
+  --card: #ffffff;
+  --card-foreground: #1B1B1B;
+  --popover: #ffffff;
+  --popover-foreground: #1B1B1B;
+  --primary: #6469FC; /* Alnix brand blue */
+  --primary-foreground: #ffffff;
+  --secondary: #ECECFE; /* Soft indigo */
+  --secondary-foreground: #5a5ff2;
+  --muted: #F4F2EC;
+  --muted-foreground: #8a8a93;
+  --accent: #F3EAFE; /* Soft purple */
+  --accent-foreground: #6469FC;
+  --destructive: #D6443B;
+  --border: #EBE7DE;
+  --input: #EBE7DE;
+  --ring: #6469FC;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -91,7 +98,7 @@
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.208 0.042 265.755);
   --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: #3b8236; /* Lighter Forest Green for dark mode */
+  --primary: #8a8fff; /* Lighter Alnix blue for dark mode */
   --primary-foreground: #ffffff;
   --secondary: oklch(0.279 0.041 260.031);
   --secondary-foreground: oklch(0.984 0.003 247.858);

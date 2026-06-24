@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/lib/utils";
 import { toast } from "sonner";
 import { SettingsApi, MessageTemplate } from "@/lib/api/settings.api";
+import { UsersApi, ManagedUser, Role } from "@/lib/api/users.api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function SettingsPage() {
   const { user, refreshUser, logout } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
 
   // ----- ACCOUNT SETTINGS STATE -----
   const [name, setName] = useState(user?.name || "");
@@ -34,6 +36,15 @@ export default function SettingsPage() {
   const [wearDaysPerAligner, setWearDaysPerAligner] = useState("");
   const [orthodontistEmail, setOrthodontistEmail] = useState("");
   const [batchEndingThreshold, setBatchEndingThreshold] = useState("");
+
+  // ----- USER MANAGEMENT STATE (admin only) -----
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<Role>("STAFF");
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -63,6 +74,65 @@ export default function SettingsPage() {
 
     loadData();
   }, []);
+
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      setUsers(await UsersApi.list());
+    } catch {
+      toast.error("Error al cargar los usuarios");
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) loadUsers();
+  }, [isAdmin]);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newUserPassword.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      await UsersApi.create({
+        email: newUserEmail.trim(),
+        name: newUserName.trim() || undefined,
+        password: newUserPassword,
+        role: newUserRole,
+      });
+      toast.success("Usuario creado exitosamente");
+      setNewUserEmail("");
+      setNewUserName("");
+      setNewUserPassword("");
+      setNewUserRole("STAFF");
+      await loadUsers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al crear el usuario");
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (target: ManagedUser) => {
+    if (target.id === user?.id) {
+      toast.error("No puedes eliminar tu propia cuenta");
+      return;
+    }
+    if (!window.confirm(`¿Eliminar al usuario ${target.email}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    try {
+      await UsersApi.remove(target.id);
+      toast.success("Usuario eliminado");
+      await loadUsers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar el usuario");
+    }
+  };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,17 +239,18 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-5xl space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Configuración Global</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B]">Configuración Global</h1>
+        <p className="mt-1.5 text-sm text-[#7c7c84]">
           Administra tu perfil, preferencias clínicas y plantillas de mensajes automatizados.
         </p>
       </div>
 
       <Tabs defaultValue="clinical" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
+        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-4" : "grid-cols-3"} mb-8`}>
           <TabsTrigger value="clinical">Preferencias Clínicas</TabsTrigger>
           <TabsTrigger value="templates">Plantillas de Mensajes</TabsTrigger>
           <TabsTrigger value="account">Mi Cuenta</TabsTrigger>
+          {isAdmin && <TabsTrigger value="users">Usuarios</TabsTrigger>}
         </TabsList>
 
         {/* CLINICAL SETTINGS TAB */}
@@ -281,7 +352,7 @@ export default function SettingsPage() {
                 <div className="flex justify-start">
                   <button
                     onClick={handleSaveClinicalSettings}
-                    className="inline-flex items-center justify-center rounded-lg bg-[#254F22] px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#1d3f1a] focus:outline-none focus:ring-2 focus:ring-[#254F22]/20 focus:ring-offset-2"
+                    className="inline-flex items-center justify-center rounded-lg bg-gradient-to-br from-[#A066F8] to-[#6469FC] px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#6469FC]/30 focus:ring-offset-2"
                   >
                     Guardar Preferencias
                   </button>
@@ -335,7 +406,7 @@ export default function SettingsPage() {
                 .map((template) => (
                 <div
                   key={template.id}
-                  className="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex flex-col h-full hover:border-[#254F22]/30 transition-colors"
+                  className="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex flex-col h-full hover:border-[#6469FC]/30 transition-colors"
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -380,7 +451,7 @@ export default function SettingsPage() {
             </div>
             <div className="p-6">
               <div className="mb-6 flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#254F22] to-[#3a7a35] text-white text-xl font-bold shadow-md">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#A066F8] to-[#6469FC] text-white text-xl font-bold shadow-md">
                   {initials}
                 </div>
                 <div>
@@ -411,7 +482,7 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={profileSaving}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#254F22] px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#1d3f1a] disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-[#A066F8] to-[#6469FC] px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:brightness-105 disabled:opacity-60"
                   >
                     {profileSaving ? "Guardando..." : "Guardar Perfil"}
                   </button>
@@ -493,6 +564,124 @@ export default function SettingsPage() {
             </div>
           </div>
         </TabsContent>
+
+        {/* USER MANAGEMENT TAB (admin only) */}
+        {isAdmin && (
+          <TabsContent value="users" className="space-y-6">
+            {/* Create user */}
+            <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h2 className="text-base font-semibold text-gray-900">Crear Usuario</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  El registro público está deshabilitado. Las cuentas se crean aquí por un administrador.
+                </p>
+              </div>
+              <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-700 mb-1.5 inline-block">Correo Electrónico</Label>
+                    <Input
+                      type="email"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      placeholder="usuario@clinica.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-700 mb-1.5 inline-block">Nombre (opcional)</Label>
+                    <Input
+                      type="text"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      placeholder="Dr. Pérez"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-700 mb-1.5 inline-block">Contraseña Temporal</Label>
+                    <Input
+                      type="password"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-700 mb-1.5 inline-block">Rol</Label>
+                    <select
+                      value={newUserRole}
+                      onChange={(e) => setNewUserRole(e.target.value as Role)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="STAFF">Staff</option>
+                      <option value="ADMIN">Administrador</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={creatingUser}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-[#A066F8] to-[#6469FC] px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:brightness-105 disabled:opacity-60"
+                  >
+                    {creatingUser ? "Creando..." : "Crear Usuario"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* User list */}
+            <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
+              <div className="border-b border-gray-100 px-6 py-4">
+                <h2 className="text-base font-semibold text-gray-900">Usuarios del Sistema</h2>
+              </div>
+              {loadingUsers ? (
+                <div className="p-6 animate-pulse space-y-3">
+                  <div className="h-12 bg-gray-100 rounded-lg"></div>
+                  <div className="h-12 bg-gray-100 rounded-lg"></div>
+                </div>
+              ) : users.length === 0 ? (
+                <p className="p-6 text-sm text-gray-500">No hay usuarios.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {users.map((u) => (
+                    <li key={u.id} className="flex items-center justify-between px-6 py-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {u.name || u.email}
+                          {u.id === user?.id && (
+                            <span className="ml-2 text-xs font-normal text-gray-400">(tú)</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            u.role === "ADMIN"
+                              ? "bg-[#ECECFE] text-[#5a5ff2]"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {u.role === "ADMIN" ? "Administrador" : "Staff"}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteUser(u)}
+                          disabled={u.id === user?.id}
+                          className="text-sm font-medium text-red-600 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:text-gray-300"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

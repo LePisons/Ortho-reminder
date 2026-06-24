@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReminderService } from './reminder/reminder.service';
@@ -14,16 +17,28 @@ import { PatientImagesModule } from './patient-images/patient-images.module';
 import { NotesModule } from './notes/notes.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { TodoistModule } from './integrations/todoist/todoist.module';
+import { DentalinkModule } from './integrations/dentalink/dentalink.module';
 import { AlignerBatchesModule } from './aligner-batches/aligner-batches.module';
 import { ReevaluationsModule } from './reevaluations/reevaluations.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { SettingsModule } from './settings/settings.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
+import { StorageModule } from './storage/storage.module';
+import { AuditModule } from './audit/audit.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000, // 1 minute window
+        limit: 120, // default cap per IP
+      },
+    ]),
+    StorageModule,
+    AuditModule,
     PatientsModule,
     ScheduleModule.forRoot(),
     MessageLogModule,
@@ -35,6 +50,7 @@ import { MessageTemplatesModule } from './message-templates/message-templates.mo
     NotesModule,
     AppointmentsModule,
     TodoistModule,
+    DentalinkModule,
     AlignerBatchesModule,
     ReevaluationsModule,
     MessagingModule,
@@ -42,7 +58,20 @@ import { MessageTemplatesModule } from './message-templates/message-templates.mo
     SettingsModule,
     MessageTemplatesModule,
   ],
-  controllers: [],
-  providers: [ReminderService, TwilioService],
+  controllers: [HealthController],
+  providers: [
+    ReminderService,
+    TwilioService,
+    // Authenticate every route by default; opt out with @Public()
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // Rate-limit every route; tighten specific routes with @Throttle()
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MessageTemplateService } from './message-template.service';
 import { WhatsAppProvider } from './providers/whatsapp.provider';
 import { EmailProvider } from './providers/email.provider';
-import { MessageChannel, MessageStatus, MessageTemplate } from '@prisma/client';
+import { MessageChannel, MessageStatus, MessageTemplate, MessageTrigger } from '@prisma/client';
 
 export interface NotificationJob {
   patientId: string;
@@ -12,7 +12,7 @@ export interface NotificationJob {
   channel: MessageChannel;
   recipient: string;
   variables: Record<string, any>;
-  triggeredBy: string;
+  triggeredBy: MessageTrigger;
   subject?: string;
 }
 

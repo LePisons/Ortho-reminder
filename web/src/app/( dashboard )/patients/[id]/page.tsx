@@ -10,6 +10,7 @@ import { AlignerProgress } from "@/components/features/patients/aligner-progress
 import { PipelineStageSelector } from "@/components/features/patients/pipeline-stage-selector";
 import { ClinicalTab } from "@/components/features/clinical/clinical-tab";
 import { ImagesTab } from "@/components/features/clinical/images-tab";
+import { MessagesTab } from "@/components/features/patients/messages-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,14 +71,27 @@ export default function PatientDetailsPage() {
   };
 
   const handleCreateBatch = async () => {
+    const alignerCount = patient?.totalAligners ?? 0;
+    if (alignerCount < 1) {
+      toast.error(
+        "Set the patient's total aligner count before starting a batch."
+      );
+      return;
+    }
     try {
       const response = await fetch(`${API_URL}/aligner-batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId: id, alignerCount: patient?.totalAligners || 0 }),
+        body: JSON.stringify({ patientId: id, alignerCount }),
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Failed to create batch");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        const message = Array.isArray(errData?.message)
+          ? errData.message.join(", ")
+          : errData?.message;
+        throw new Error(message || "Failed to create batch");
+      }
       toast.success("New batch started");
       fetchPatient();
     } catch (error: Error | unknown) {
@@ -177,11 +191,17 @@ export default function PatientDetailsPage() {
           <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
 
           <Tabs defaultValue={defaultTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="clinical">Clinical History</TabsTrigger>
               <TabsTrigger value="batch">Lab Pipeline</TabsTrigger>
               <TabsTrigger value="photos">Photos</TabsTrigger>
               <TabsTrigger value="xrays">X-Rays</TabsTrigger>
+              <TabsTrigger value="messages" className="relative">
+                Mensajes
+                {patient.unreadMessagesCount > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse" />
+                )}
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="clinical">
               <ClinicalTab
@@ -257,6 +277,12 @@ export default function PatientDetailsPage() {
                 images={patient.patientImages || []}
                 type="XRAY"
                 onUpdate={fetchPatient}
+              />
+            </TabsContent>
+            <TabsContent value="messages">
+              <MessagesTab 
+                patientId={patient.id} 
+                onUpdate={fetchPatient} 
               />
             </TabsContent>
           </Tabs>

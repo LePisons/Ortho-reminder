@@ -7,36 +7,39 @@ import {
   Param,
   Delete,
   Query,
+  Request,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import { memoryStorage } from 'multer';
+import { randomUUID } from 'crypto';
 import { PatientImagesService } from './patient-images.service';
 import { CreatePatientImageDto } from './dto/create-patient-image.dto';
 import { UpdatePatientImageDto } from './dto/update-patient-image.dto';
+import { R2Service } from '../storage/r2.service';
+import {
+  detectImageContentType,
+  extensionForContentType,
+} from '../storage/image-validation';
 
 @Controller('patient-images')
 export class PatientImagesController {
-  constructor(private readonly patientImagesService: PatientImagesService) {}
+  constructor(
+    private readonly patientImagesService: PatientImagesService,
+    private readonly r2: R2Service,
+  ) {}
 
   @Post()
-  create(@Body() createPatientImageDto: CreatePatientImageDto) {
-    return this.patientImagesService.create(createPatientImageDto);
+  create(@Body() createPatientImageDto: CreatePatientImageDto, @Request() req) {
+    return this.patientImagesService.create(createPatientImageDto, req.user.userId);
   }
 
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads', 'patient-images'),
-        filename: (_req, file, cb) => {
-          const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
+      storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.match(/^image\//)) {
           return cb(new BadRequestException('Only image files are allowed'), false);
@@ -49,52 +52,72 @@ export class PatientImagesController {
   async uploadImage(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { patientId: string; type: string; category?: string; date?: string; description?: string },
+    @Request() req,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
+    if (!body.patientId) {
+      throw new BadRequestException('patientId is required');
+    }
 
-    const apiUrl = process.env.API_URL || 'http://localhost:3001';
-    const url = `${apiUrl}/uploads/patient-images/${file.filename}`;
+    // Verify real image bytes, not just the client-supplied mimetype.
+    const contentType = detectImageContentType(file.buffer);
+    if (!contentType) {
+      throw new BadRequestException('Unsupported or invalid image file');
+    }
 
-    return this.patientImagesService.create({
-      url,
-      type: body.type as 'PHOTO' | 'XRAY',
-      patientId: body.patientId,
-      category: body.category,
-      date: body.date,
-      description: body.description,
-    });
+    const key = `patient-images/${body.patientId}/${randomUUID()}.${extensionForContentType(contentType)}`;
+    await this.r2.putObject(key, file.buffer, contentType);
+
+    try {
+      return await this.patientImagesService.create(
+        {
+          url: key, // store the opaque R2 key; signed URLs are generated on read
+          type: body.type as 'PHOTO' | 'XRAY',
+          patientId: body.patientId,
+          category: body.category,
+          date: body.date,
+          description: body.description,
+        },
+        req.user.userId,
+      );
+    } catch (e) {
+      // Ownership/validation failed after upload — don't leave an orphaned object.
+      await this.r2.deleteObject(key).catch(() => undefined);
+      throw e;
+    }
   }
 
   @Get()
-  findAll(@Query('patientId') patientId: string) {
-    return this.patientImagesService.findAll(patientId);
+  findAll(@Query('patientId') patientId: string, @Request() req) {
+    return this.patientImagesService.findAll(patientId, req.user.userId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.patientImagesService.findOne(id);
+  findOne(@Param('id') id: string, @Request() req) {
+    return this.patientImagesService.findOne(id, req.user.userId);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePatientImageDto: UpdatePatientImageDto) {
-    return this.patientImagesService.update(id, updatePatientImageDto);
+  update(@Param('id') id: string, @Body() updatePatientImageDto: UpdatePatientImageDto, @Request() req) {
+    return this.patientImagesService.update(id, updatePatientImageDto, req.user.userId);
   }
 
   @Delete('session')
   removeSession(
     @Query('patientId') patientId: string,
     @Query('date') date: string,
+    @Request() req,
   ) {
     if (!patientId || !date) {
       throw new BadRequestException('Patient ID and date are required');
     }
-    return this.patientImagesService.removeSession(patientId, date);
+    return this.patientImagesService.removeSession(patientId, date, req.user.userId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.patientImagesService.remove(id);
+  remove(@Param('id') id: string, @Request() req) {
+    return this.patientImagesService.remove(id, req.user.userId);
   }
 }

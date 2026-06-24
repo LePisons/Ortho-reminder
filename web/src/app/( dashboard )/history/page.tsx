@@ -154,10 +154,10 @@ export default function HistoryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+        <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B]">
           Message History
         </h1>
-        <p className="text-gray-500 mt-1">
+        <p className="text-[#7c7c84] mt-1.5">
           All notifications sent to your patients
         </p>
       </div>

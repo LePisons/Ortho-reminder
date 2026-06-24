@@ -1,6 +1,9 @@
 import { Controller, Get, Param, Post } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
+import { Public } from '../auth/public.decorator';
 
+// Patient-facing onboarding via a one-time token; no user session exists yet.
+@Public()
 @Controller('onboarding')
 export class OnboardingController {
   constructor(private readonly onboardingService: OnboardingService) {}

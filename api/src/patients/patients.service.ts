@@ -4,7 +4,10 @@ import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationDispatcherService } from '../messaging/notification-dispatcher.service';
 import { AlignerService } from './aligner.service';
-import { Prisma, MessageTemplateType, MessageChannel } from '@prisma/client';
+import { Prisma, MessageTemplateType, MessageChannel, PipelineStage } from '@prisma/client';
+import { R2Service } from '../storage/r2.service';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PatientsService {
@@ -12,7 +15,45 @@ export class PatientsService {
     private prisma: PrismaService,
     private notificationDispatcher: NotificationDispatcherService,
     private alignerService: AlignerService,
+    private r2: R2Service,
+    private audit: AuditService,
   ) {}
+
+  // Loads a non-deleted patient and verifies it belongs to the requesting user.
+  // Throws NotFound if it doesn't exist, Forbidden if owned by someone else.
+  private async assertOwnership(id: string, userId: string) {
+    const patient = await this.prisma.patient.findUnique({ where: { id } });
+    if (!patient || patient.deletedAt) {
+      throw new NotFoundException('Patient not found');
+    }
+    if (patient.userId !== userId) {
+      throw new ForbiddenException();
+    }
+    return patient;
+  }
+
+  // Stored avatar/image values are R2 object keys; legacy rows hold an absolute
+  // http(s) URL from the old disk storage. Sign keys, pass legacy URLs through.
+  private async signStoredUrl(value?: string | null): Promise<string | null | undefined> {
+    if (!value || /^https?:\/\//i.test(value)) return value;
+    return this.r2.getSignedReadUrl(value);
+  }
+
+  // Replaces avatarUrl + any included patientImages[].url with short-lived signed URLs.
+  private async signPatientUrls(patient: any): Promise<any> {
+    if (!patient) return patient;
+    const avatarUrl = await this.signStoredUrl(patient.avatarUrl);
+    let patientImages = patient.patientImages;
+    if (Array.isArray(patientImages)) {
+      patientImages = await Promise.all(
+        patientImages.map(async (img: any) => ({
+          ...img,
+          url: await this.signStoredUrl(img.url),
+        })),
+      );
+    }
+    return { ...patient, avatarUrl, patientImages };
+  }
 
   // This method now needs to be async to handle the message sending
   async create(createPatientDto: CreatePatientDto, userId: string) {
@@ -57,28 +98,53 @@ export class PatientsService {
       }
     });
 
-    // Step 2: After the patient is successfully created, try to send a welcome message via EMAIL
+    await this.audit.log({
+      actorId: userId,
+      action: 'CREATE',
+      entity: 'Patient',
+      entityId: newPatient.id,
+      metadata: { fullName: newPatient.fullName },
+    });
+
+    // Step 2: Try to send a welcome message (Prioritize WhatsApp, fallback to Email)
     try {
-      // 1. Find the WELCOME template for EMAIL channel
-      const welcomeTemplate = await this.prisma.messageTemplate.findFirst({
-        where: { type: MessageTemplateType.WELCOME, channel: MessageChannel.EMAIL, isActive: true }
+      const welcomeTemplateWa = await this.prisma.messageTemplate.findFirst({
+        where: { type: MessageTemplateType.WELCOME, channel: MessageChannel.WHATSAPP, isActive: true }
       });
 
-      if (welcomeTemplate && newPatient.email) {
-        // 2. Dispatch it via Resend (email)
+      if (welcomeTemplateWa && newPatient.phone) {
         await this.notificationDispatcher.dispatch({
           patientId: newPatient.id,
           templateType: MessageTemplateType.WELCOME,
-          template: welcomeTemplate,
-          channel: MessageChannel.EMAIL,
-          recipient: newPatient.email,
+          template: welcomeTemplateWa,
+          channel: MessageChannel.WHATSAPP,
+          recipient: newPatient.phone,
           variables: {
             patient_name: newPatient.fullName.split(' ')[0],
-            clinic_name: 'Alnix'
           },
           triggeredBy: 'manual',
-          subject: `¡Bienvenido/a a Alnix, ${newPatient.fullName.split(' ')[0]}!`,
         });
+      } else {
+        // Fallback to email
+        const welcomeTemplateEmail = await this.prisma.messageTemplate.findFirst({
+          where: { type: MessageTemplateType.WELCOME, channel: MessageChannel.EMAIL, isActive: true }
+        });
+  
+        if (welcomeTemplateEmail && newPatient.email) {
+          await this.notificationDispatcher.dispatch({
+            patientId: newPatient.id,
+            templateType: MessageTemplateType.WELCOME,
+            template: welcomeTemplateEmail,
+            channel: MessageChannel.EMAIL,
+            recipient: newPatient.email,
+            variables: {
+              patient_name: newPatient.fullName.split(' ')[0],
+              clinic_name: 'Alnix'
+            },
+            triggeredBy: 'manual',
+            subject: `¡Bienvenido/a a Alnix, ${newPatient.fullName.split(' ')[0]}!`,
+          });
+        }
       }
     } catch (error) {
       console.error(
@@ -131,12 +197,14 @@ export class PatientsService {
   }
 
   // The method now needs to accept page and limit, with defaults
-  async findAll(page: number = 1, limit: number = 10) {
+  async findAll(page: number = 1, limit: number = 10, userId: string) {
     const skip = (page - 1) * limit; // Calculate how many records to skip
+    const where = { userId, deletedAt: null };
 
     // We now run two queries: one for the data, one for the total count
     const [patients, total] = await this.prisma.$transaction([
       this.prisma.patient.findMany({
+        where,
         skip: skip,
         take: limit,
         orderBy: { createdAt: 'desc' }, // Always good to have a consistent order
@@ -154,11 +222,13 @@ export class PatientsService {
           }
         }
       }),
-      this.prisma.patient.count(),
+      this.prisma.patient.count({ where }),
     ]);
 
     return {
-      data: patients.map(p => this.mapPatientWithUrgency(p)),
+      data: await Promise.all(
+        patients.map(p => this.signPatientUrls(this.mapPatientWithUrgency(p))),
+      ),
       total,
       page,
       limit,
@@ -166,9 +236,9 @@ export class PatientsService {
     };
   }
 
-  async findOne(id: string) {
-    const patient = await this.prisma.patient.findUnique({
-      where: { id: id },
+  async findOne(id: string, userId: string) {
+    const patient = await this.prisma.patient.findFirst({
+      where: { id, userId, deletedAt: null },
       include: {
         onboardingToken: true,
         clinicalRecords: true,
@@ -185,11 +255,41 @@ export class PatientsService {
         }
       },
     });
-    return patient ? this.mapPatientWithUrgency(patient) : null;
+
+    if (!patient) return null;
+
+    const unreadMessagesCount = await this.prisma.messageLog.count({
+      where: {
+        patientId: id,
+        direction: 'INCOMING',
+        isRead: false
+      }
+    });
+
+    return this.signPatientUrls({ ...this.mapPatientWithUrgency(patient), unreadMessagesCount });
+  }
+
+  async getMessages(patientId: string, userId: string) {
+    await this.assertOwnership(patientId, userId);
+    return this.prisma.messageLog.findMany({
+      where: { patientId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async markMessagesRead(patientId: string, userId: string) {
+    await this.assertOwnership(patientId, userId);
+    await this.prisma.messageLog.updateMany({
+      where: { patientId, direction: 'INCOMING', isRead: false },
+      data: { isRead: true },
+    });
+    return { success: true };
   }
 
   // Note: The update method could also be modified to handle dates correctly if needed
-  async update(id: string, updatePatientDto: UpdatePatientDto) {
+  async update(id: string, updatePatientDto: UpdatePatientDto, userId: string) {
+    await this.assertOwnership(id, userId);
+
     // 2. Create a correctly typed data object
     const dataToUpdate: Prisma.PatientUpdateInput = {
       ...updatePatientDto,
@@ -212,14 +312,33 @@ export class PatientsService {
       where: { id },
       data: dataToUpdate, // 4. Now this assignment is safe!
     });
-    
+
+    await this.audit.log({
+      actorId: userId,
+      action: 'UPDATE',
+      entity: 'Patient',
+      entityId: id,
+      metadata: { fields: Object.keys(updatePatientDto) },
+    });
+
     return this.mapPatientWithUrgency(updated);
   }
 
-  remove(id: string) {
-    return this.prisma.patient.delete({
+  // Soft delete: keep the row (and all clinical history) for retention/audit,
+  // just mark it deleted so it disappears from queries.
+  async remove(id: string, userId: string) {
+    await this.assertOwnership(id, userId);
+    const deleted = await this.prisma.patient.update({
       where: { id },
+      data: { deletedAt: new Date() },
     });
+    await this.audit.log({
+      actorId: userId,
+      action: 'DELETE',
+      entity: 'Patient',
+      entityId: id,
+    });
+    return deleted;
   }
 
   /**
@@ -301,15 +420,9 @@ export class PatientsService {
    * setPipelineOverride: Manually fixes the patient into a specific pipeline
    * stage. Pass null to restore automatic calculation.
    */
-  async setPipelineOverride(id: string, stage: string | null) {
-    const VALID_STAGES = [
-      'REQUIRED_FILES',
-      'IN_PRODUCTION',
-      'READY_FOR_PICKUP',
-      'IN_TREATMENT',
-      'ENDING_SOON',
-      'REEVALUATION',
-    ];
+  async setPipelineOverride(id: string, stage: string | null, userId: string) {
+    await this.assertOwnership(id, userId);
+    const VALID_STAGES = Object.values(PipelineStage) as string[];
 
     if (stage !== null && !VALID_STAGES.includes(stage)) {
       throw new Error(`Invalid pipeline stage: ${stage}`);
@@ -317,13 +430,14 @@ export class PatientsService {
 
     const updated = await this.prisma.patient.update({
       where: { id },
-      data: { pipelineOverride: stage },
+      data: { pipelineOverride: stage as PipelineStage | null },
     });
 
     return this.mapPatientWithUrgency(updated);
   }
 
-  async adjustAligner(id: string, alignerNumber: number) {
+  async adjustAligner(id: string, alignerNumber: number, userId: string) {
+    await this.assertOwnership(id, userId);
     // Route through the single write path — resets the cron anchor to today
     const updated = await this.alignerService.setCurrentAligner(
       id,
@@ -334,7 +448,8 @@ export class PatientsService {
     return this.mapPatientWithUrgency(updated);
   }
 
-  async setLastAppointment(id: string, date: string) {
+  async setLastAppointment(id: string, date: string, userId: string) {
+    await this.assertOwnership(id, userId);
     const updated = await this.prisma.patient.update({
       where: { id },
       data: { lastAppointmentDate: new Date(date + 'T00:00:00') },
@@ -343,24 +458,24 @@ export class PatientsService {
     return this.mapPatientWithUrgency(updated);
   }
 
-  async getStats() {
-    const total = await this.prisma.patient.count();
+  async getStats(userId: string) {
+    const total = await this.prisma.patient.count({ where: { userId, deletedAt: null } });
     const active = await this.prisma.patient.count({
-      where: { status: 'ACTIVE' },
+      where: { userId, deletedAt: null, status: 'ACTIVE' },
     });
     const paused = await this.prisma.patient.count({
-      where: { status: 'PAUSED' },
+      where: { userId, deletedAt: null, status: 'PAUSED' },
     });
     const finished = await this.prisma.patient.count({
-      where: { status: 'FINISHED' },
+      where: { userId, deletedAt: null, status: 'FINISHED' },
     });
 
     return { total, active, paused, finished };
   }
 
-  async getPipeline() {
+  async getPipeline(userId: string) {
     const activePatients = await this.prisma.patient.findMany({
-      where: { status: 'ACTIVE' },
+      where: { userId, deletedAt: null, status: 'ACTIVE' },
       include: {
         onboardingToken: true,
         alignerBatches: {
@@ -376,8 +491,10 @@ export class PatientsService {
       }
     });
 
-    const mappedPatients = activePatients.map(p => this.mapPatientWithUrgency(p));
-    
+    const mappedPatients = await Promise.all(
+      activePatients.map(p => this.signPatientUrls(this.mapPatientWithUrgency(p))),
+    );
+
     // Group patients by pipelineStage
     const pipeline = {
       REQUIRED_FILES: [] as any[],
@@ -397,9 +514,9 @@ export class PatientsService {
     return pipeline;
   }
 
-  async findUpcomingChanges(page: number = 1, limit: number = 5) {
+  async findUpcomingChanges(page: number = 1, limit: number = 5, userId: string) {
     const activePatients = await this.prisma.patient.findMany({
-      where: { status: 'ACTIVE' },
+      where: { userId, deletedAt: null, status: 'ACTIVE' },
       include: {
         alignerBatches: {
           where: { status: { notIn: ['DELIVERED_TO_CLINIC', 'HANDED_TO_PATIENT', 'CANCELLED'] } },
@@ -416,18 +533,22 @@ export class PatientsService {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const msPerDay = 24 * 60 * 60 * 1000;
 
-    const patientsWithNextChange = activePatients.map((patient) => {
-      const startDate = new Date(patient.treatmentStartDate);
-      const timeDiff = today.getTime() - startDate.getTime();
-      const daysSinceStart = Math.floor(timeDiff / (1000 * 3600 * 24));
+    const patientsWithNextChange = activePatients
+      .filter((patient) => patient.lastAlignerSetAt) // skip patients without tracking
+      .map((patient) => {
+      // Use the same anchor + wear-days source of truth as AlignerService
+      const anchorDate = new Date(patient.lastAlignerSetAt!);
+      anchorDate.setHours(0, 0, 0, 0);
+      const wearDays = patient.wearDaysPerAligner || 14;
 
-      const remainder =
-        daysSinceStart >= 0 ? daysSinceStart % patient.changeFrequency : 0;
-      // If remainder is 0 and treatment has started, today IS a change day
-      const daysUntilNextChange = (daysSinceStart > 0 && remainder === 0)
-        ? 0
-        : patient.changeFrequency - remainder;
+      const daysSinceAnchor = Math.floor(
+        (today.getTime() - anchorDate.getTime()) / msPerDay,
+      );
+
+      // Days until the current aligner's wear period ends
+      const daysUntilNextChange = Math.max(0, wearDays - daysSinceAnchor);
 
       const nextChangeDate = new Date(today);
       nextChangeDate.setDate(today.getDate() + daysUntilNextChange);
@@ -461,11 +582,13 @@ export class PatientsService {
       totalPages: Math.ceil(sortedPatients.length / limit),
     };
   }
-  async uploadAvatar(id: string, url: string) {
-    return this.prisma.patient.update({
+  async uploadAvatar(id: string, key: string, userId: string) {
+    await this.assertOwnership(id, userId);
+    const updated = await this.prisma.patient.update({
       where: { id },
-      data: { avatarUrl: url },
+      data: { avatarUrl: key },
     });
+    return this.signPatientUrls(updated);
   }
 
   async searchPatients(query: string, userId: string) {
@@ -492,7 +615,7 @@ export class PatientsService {
       },
     });
 
-    return patients.map(p => {
+    return Promise.all(patients.map(async p => {
       const mapped = this.mapPatientWithUrgency(p);
       return {
         id: mapped.id,
@@ -500,10 +623,10 @@ export class PatientsService {
         currentAligner: mapped.currentAligner,
         totalAligners: mapped.totalAligners,
         status: mapped.status,
-        avatarUrl: mapped.avatarUrl,
+        avatarUrl: await this.signStoredUrl(mapped.avatarUrl),
         pipelineStage: mapped.pipelineStage,
       };
-    });
+    }));
   }
 
   // Helper method to compute urgencyStatus and append to patient objects

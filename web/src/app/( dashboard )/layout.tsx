@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, ChevronsLeft, ChevronsRight } from "lucide-react";
+import Image from "next/image";
+import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, PanelLeftClose, PanelLeftOpen, Stethoscope } from "lucide-react";
 import { PatientSearch } from "@/components/features/patients/patient-search";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { href: "/pipeline", label: "Pipeline", icon: <ClipboardList className="w-5 h-5" /> },
   { href: "/calendar", label: "Calendar", icon: <CalendarDays className="w-5 h-5" /> },
+  { href: "/controles", label: "Controles", icon: <Stethoscope className="w-5 h-5" /> },
   { href: "/history", label: "Message History", icon: <MessageSquare className="w-5 h-5" /> },
   { href: "/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
@@ -43,9 +45,9 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className={`flex w-full items-center gap-3 rounded-2xl p-2.5 transition-all duration-200 hover:bg-white/10 group focus:outline-none ${collapsed ? "justify-center" : ""}`}
+        className={`flex w-full items-center gap-3 rounded-xl p-2.5 transition-all duration-200 bg-white/[0.06] hover:bg-white/10 group focus:outline-none ${collapsed ? "justify-center" : ""}`}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-primary text-sm font-bold shadow-sm">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#A066F8] to-[#6469FC] text-white text-sm font-bold shadow-sm">
           {initials}
         </div>
         {!collapsed && (
@@ -125,30 +127,71 @@ export default function DashboardLayout({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#254F22]" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#6469FC]" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
       <aside
-        className={`relative z-10 flex flex-col bg-[#3a7a35]/85 backdrop-blur-2xl border-r border-white/20 rounded-r-3xl shadow-2xl shrink-0 my-0 shadow-primary/20 transition-all duration-300 ease-in-out overflow-hidden ${
-          collapsed ? "w-[72px]" : "w-[280px]"
+        className={`relative z-10 flex flex-col bg-[#1B1B1B] text-white border-r border-black/40 shadow-2xl shrink-0 my-0 transition-all duration-300 ease-in-out overflow-hidden ${
+          collapsed ? "w-[72px]" : "w-[264px]"
         }`}
       >
-        {/* Logo */}
-        <div className={`flex items-center gap-3 pt-10 pb-8 transition-all duration-300 ${collapsed ? "px-0 justify-center" : "px-6"}`}>
-          <div className="w-10 h-10 rounded-xl border-2 border-white/20 flex items-center justify-center shrink-0 shadow-sm">
-             <span className="text-white text-xl font-bold">O</span>
-          </div>
-          {!collapsed && (
-            <h2 className="text-2xl font-black tracking-tight text-white whitespace-nowrap">
-              OrthoReminder
-            </h2>
-          )}
+        {/* Logo + Collapse Toggle */}
+        <div
+          className={`flex pt-7 pb-6 transition-all duration-300 ${
+            collapsed ? "px-2 flex-col items-center gap-4" : "px-6 items-center gap-3"
+          }`}
+        >
+          <Link
+            href="/"
+            title="Go to Dashboard"
+            className="flex items-center gap-3 min-w-0 transition-opacity hover:opacity-80"
+          >
+            {collapsed ? (
+              <Image
+                src="/alnix-mark-white.svg"
+                alt="Alnix"
+                width={32}
+                height={32}
+                priority
+                className="h-8 w-auto shrink-0"
+              />
+            ) : (
+              <div className="flex flex-col leading-none whitespace-nowrap">
+                <Image
+                  src="/alnix-logo-white.svg"
+                  alt="Alnix"
+                  width={120}
+                  height={18}
+                  priority
+                  className="h-[22px] w-auto"
+                />
+                <span className="text-[10px] font-semibold tracking-[0.34em] text-white/45 mt-2">
+                  ORTHOREMINDER
+                </span>
+              </div>
+            )}
+          </Link>
+
+          <button
+            onClick={toggleCollapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white focus:outline-none ${
+              collapsed ? "" : "ml-auto"
+            }`}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-[18px] w-[18px]" />
+            ) : (
+              <PanelLeftClose className="h-[18px] w-[18px]" />
+            )}
+          </button>
         </div>
 
         {/* User Section */}
@@ -174,12 +217,12 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 title={collapsed ? item.label : undefined}
-                className={`flex items-center gap-4 py-3.5 text-sm transition-all duration-200 ${
-                  collapsed ? "px-0 justify-center" : "px-4"
+                className={`flex items-center gap-4 py-3 text-sm transition-all duration-200 rounded-xl ${
+                  collapsed ? "px-0 justify-center" : "px-3.5"
                 } ${
                   isActive
-                    ? "bg-white/10 text-white font-bold rounded-2xl shadow-sm border border-white/5 backdrop-blur-sm"
-                    : "text-white/70 hover:bg-white/5 hover:text-white font-medium rounded-2xl border border-transparent"
+                    ? "bg-gradient-to-br from-[#A066F8] to-[#6469FC] text-white font-bold shadow-[0_6px_18px_rgba(100,105,252,0.4)]"
+                    : "text-[#b6b6bd] hover:bg-white/[0.06] hover:text-white font-semibold"
                 }`}
               >
                 <span className={`text-lg shrink-0 ${isActive ? 'opacity-100' : 'opacity-70'}`}>{item.icon}</span>
@@ -189,25 +232,6 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* Collapse Toggle */}
-        <div className={`pb-6 shrink-0 ${collapsed ? "px-2" : "px-4"}`}>
-          <button
-            onClick={toggleCollapsed}
-            className={`flex items-center gap-3 w-full py-3 text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-200 ${
-              collapsed ? "justify-center px-0" : "px-4"
-            }`}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? (
-              <ChevronsRight className="w-5 h-5 shrink-0" />
-            ) : (
-              <>
-                <ChevronsLeft className="w-5 h-5 shrink-0" />
-                <span className="whitespace-nowrap">Collapse</span>
-              </>
-            )}
-          </button>
-        </div>
       </aside>
 
       {/* Main Content Area */}

@@ -228,8 +228,8 @@ export function CalendarView({ onToggleNotes, notesOpen }: CalendarViewProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-6 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-6">
-          <h2 className="text-3xl font-bold text-gray-900 capitalize tracking-tight flex items-center gap-3">
-            <CalendarIcon className="h-8 w-8 text-emerald-400 drop-shadow-sm" />
+          <h2 className="text-[30px] font-extrabold text-[#1B1B1B] capitalize tracking-tight flex items-center gap-3">
+            <CalendarIcon className="h-8 w-8 text-[#6469FC] drop-shadow-sm" />
             {format(currentDate, "MMMM yyyy")}
           </h2>
           <div className="flex items-center rounded-lg border border-gray-300 bg-white shadow-sm ring-1 ring-gray-950/5">
@@ -457,14 +457,14 @@ export function CalendarView({ onToggleNotes, notesOpen }: CalendarViewProps) {
       </div>
 
       {/* Useful Info Block */}
-      <div className="bg-emerald-50/50 border-t border-emerald-100/50 p-4 shrink-0 flex items-center justify-between">
+      <div className="bg-[#F3EAFE]/50 border-t border-[#ECECFE] p-4 shrink-0 flex items-center justify-between">
          <div className="flex items-center gap-4">
-             <div className="h-10 w-10 rounded-full bg-emerald-100/80 flex items-center justify-center shadow-sm">
-                 <CalendarIcon className="h-5 w-5 text-emerald-600" />
+             <div className="h-10 w-10 rounded-full bg-[#ECECFE] flex items-center justify-center shadow-sm">
+                 <CalendarIcon className="h-5 w-5 text-[#6469FC]" />
              </div>
              <div>
-                 <p className="text-sm font-bold text-emerald-900">Weekly Orthodontic Overview</p>
-                 <p className="text-xs text-emerald-700 font-medium">
+                 <p className="text-sm font-bold text-[#1B1B1B]">Weekly Orthodontic Overview</p>
+                 <p className="text-xs text-[#6b6b73] font-medium">
                      You have {appointments.filter(a => new Date(a.start) >= new Date() && new Date(a.start) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)).length} upcoming events in the next 7 days.
                  </p>
              </div>
