@@ -54,6 +54,6 @@ async function bootstrap() {
   // Patient images and avatars are stored privately in R2 and served via
   // short-lived signed URLs — no public static file serving.
 
-  await app.listen(3001);
+  await app.listen(process.env.PORT ?? 3001, '::');
 }
 bootstrap();
