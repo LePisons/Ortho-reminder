@@ -4,7 +4,7 @@ import { Twilio } from 'twilio';
 @Injectable()
 export class TwilioService {
   private readonly logger = new Logger(TwilioService.name);
-  private readonly twilioClient: Twilio;
+  private readonly twilioClient?: Twilio;
 
   constructor() {
     // Initialize the Twilio client once, right here
@@ -12,7 +12,12 @@ export class TwilioService {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
     if (!accountSid || !authToken) {
-      throw new Error('Twilio credentials are not defined in .env file');
+      // Twilio is an optional integration; don't crash the whole app at boot
+      // when it isn't configured. sendWhatsApp() will fail clearly if used.
+      this.logger.warn(
+        'Twilio credentials not set; WhatsApp sending via Twilio is disabled',
+      );
+      return;
     }
 
     this.twilioClient = new Twilio(accountSid, authToken);
@@ -21,6 +26,11 @@ export class TwilioService {
 
   // Create a public method to send messages
   async sendWhatsApp(to: string, body: string) {
+    if (!this.twilioClient) {
+      throw new Error(
+        'Twilio is not configured (set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN)',
+      );
+    }
     try {
       const from = process.env.TWILIO_WHATSAPP_NUMBER;
       const message = await this.twilioClient.messages.create({
