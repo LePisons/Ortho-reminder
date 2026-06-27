@@ -30,6 +30,7 @@ export interface Patient {
   reevaluations?: Reevaluation[];
   whatsappOptedIn?: boolean;
   whatsappOptedInAt?: string | null;
+  unreadMessagesCount?: number;
   onboardingToken?: {
     token: string;
     expiresAt: string;

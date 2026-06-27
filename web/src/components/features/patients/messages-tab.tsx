@@ -15,6 +15,7 @@ interface MessageLog {
   status: string;
   createdAt: string;
   triggeredBy: string;
+  isRead: boolean;
 }
 
 interface MessagesTabProps {
@@ -51,7 +52,7 @@ export function MessagesTab({ patientId, onUpdate }: MessagesTabProps) {
 
       // Check if there are unread incoming messages and mark them read
       const hasUnread = data.some(
-        (m: any) => m.direction === "INCOMING" && m.isRead === false
+        (m: MessageLog) => m.direction === "INCOMING" && m.isRead === false
       );
       if (hasUnread) {
         await fetch(`${API_URL}/patients/${patientId}/messages/read`, {

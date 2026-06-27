@@ -114,12 +114,12 @@ export function PatientTable({ patients, onDataChange }: PatientTableProps) {
                 {new Date(patient.treatmentStartDate).toLocaleDateString()}
               </TableCell>
               <TableCell>
-                {patient.currentAligner > 0 ? (
+                {(patient.currentAligner ?? 0) > 0 ? (
                   <span className="inline-flex items-center gap-1 text-sm font-semibold text-gray-800">
                     <span className="bg-[#ECECFE] text-[#5a5ff2] rounded-md px-2 py-0.5 text-xs font-bold">
                       {patient.currentAligner}
                     </span>
-                    {patient.totalAligners > 0 && (
+                    {(patient.totalAligners ?? 0) > 0 && (
                       <span className="text-gray-400 text-xs">/ {patient.totalAligners}</span>
                     )}
                   </span>

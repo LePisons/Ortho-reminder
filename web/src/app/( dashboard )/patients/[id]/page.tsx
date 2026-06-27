@@ -198,7 +198,7 @@ export default function PatientDetailsPage() {
               <TabsTrigger value="xrays">X-Rays</TabsTrigger>
               <TabsTrigger value="messages" className="relative">
                 Mensajes
-                {patient.unreadMessagesCount > 0 && (
+                {(patient.unreadMessagesCount ?? 0) > 0 && (
                   <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse" />
                 )}
               </TabsTrigger>
