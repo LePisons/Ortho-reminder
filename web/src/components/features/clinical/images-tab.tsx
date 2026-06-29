@@ -151,10 +151,13 @@ interface ImagesTabProps {
   patientId: string;
   images: PatientImage[];
   type: "PHOTO" | "XRAY";
-  onUpdate: () => void;
+  // Patch the patient's image list in place. Avoids a full patient refetch,
+  // which would re-sign every image URL and force the browser to re-download
+  // all images instead of just the one that changed.
+  onImagesChange: (updater: (images: PatientImage[]) => PatientImage[]) => void;
 }
 
-export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps) {
+export function ImagesTab({ patientId, images, type, onImagesChange }: ImagesTabProps) {
   const slots = type === "PHOTO" ? PHOTO_SLOTS : XRAY_SLOTS;
   const filteredImages = images.filter((img) => img.type === type);
 
@@ -259,8 +262,11 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to upload image");
+      const created: PatientImage = await response.json();
       toast.success("Image uploaded");
-      onUpdate();
+      // Append just the new image so the other photos keep their existing
+      // (already-loaded) signed URLs and don't reload.
+      onImagesChange((prev) => [created, ...prev]);
       setUploadDialog({ open: false, category: "", dateKey: "" });
     } catch (error) {
       toast.error("Failed to upload image");
@@ -279,7 +285,7 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
       if (!response.ok) throw new Error("Failed to delete");
       toast.success("Image deleted");
       setDeleteTarget(null);
-      onUpdate();
+      onImagesChange((prev) => prev.filter((img) => img.id !== imageId));
     } catch (error) {
       toast.error("Failed to delete image");
       console.error(error);
@@ -298,15 +304,21 @@ export function ImagesTab({ patientId, images, type, onUpdate }: ImagesTabProps)
         }
       );
       if (!response.ok) throw new Error("Failed to delete session");
+      const removedDateKey = deleteSessionTarget.dateKey;
       toast.success("Session deleted");
       setDeleteSessionTarget(null);
       // Remove from expanded if present
       setExpandedDates((prev) => {
         const next = new Set(prev);
-        next.delete(deleteSessionTarget.dateKey);
+        next.delete(removedDateKey);
         return next;
       });
-      onUpdate();
+      // Drop every image in the deleted session; the rest keep their URLs.
+      onImagesChange((prev) =>
+        prev.filter(
+          (img) => format(new Date(img.date), "yyyy-MM-dd") !== removedDateKey
+        )
+      );
     } catch (error) {
       toast.error("Failed to delete session");
       console.error(error);

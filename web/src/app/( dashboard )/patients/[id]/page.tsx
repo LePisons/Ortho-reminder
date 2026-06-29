@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { API_URL } from "@/lib/utils";
-import { Patient, AlignerBatch } from "@/lib/types";
+import { Patient, AlignerBatch, PatientImage } from "@/lib/types";
 import { PatientInfoCard } from "@/components/features/patients/patient-info-card";
 import { PatientSummaryCard } from "@/components/features/patients/patient-summary-card";
 import { AlignerProgress } from "@/components/features/patients/aligner-progress";
@@ -49,6 +49,18 @@ export default function PatientDetailsPage() {
       fetchPatient();
     }
   }, [id, fetchPatient]);
+
+  // Patch the patient's images in place so uploading/deleting one photo doesn't
+  // refetch the whole patient (which re-signs every image URL and forces the
+  // browser to re-download all of them).
+  const updateImages = useCallback(
+    (updater: (images: PatientImage[]) => PatientImage[]) => {
+      setPatient((prev) =>
+        prev ? { ...prev, patientImages: updater(prev.patientImages || []) } : prev
+      );
+    },
+    []
+  );
 
   const handleStatusChange = async (batchId: string, action: string, payload?: unknown) => {
     try {
@@ -268,7 +280,7 @@ export default function PatientDetailsPage() {
                 patientId={patient.id}
                 images={patient.patientImages || []}
                 type="PHOTO"
-                onUpdate={fetchPatient}
+                onImagesChange={updateImages}
               />
             </TabsContent>
             <TabsContent value="xrays">
@@ -276,7 +288,7 @@ export default function PatientDetailsPage() {
                 patientId={patient.id}
                 images={patient.patientImages || []}
                 type="XRAY"
-                onUpdate={fetchPatient}
+                onImagesChange={updateImages}
               />
             </TabsContent>
             <TabsContent value="messages">

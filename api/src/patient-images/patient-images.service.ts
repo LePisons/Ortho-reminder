@@ -44,9 +44,12 @@ export class PatientImagesService {
 
   async create(createPatientImageDto: CreatePatientImageDto, userId: string) {
     await this.assertPatientOwnership(createPatientImageDto.patientId, userId);
-    return this.prisma.patientImage.create({
+    const image = await this.prisma.patientImage.create({
       data: createPatientImageDto,
     });
+    // Return a signed URL so the client can render the new image immediately
+    // without refetching the whole patient.
+    return this.withSignedUrl(image);
   }
 
   async findAll(patientId: string, userId: string) {
