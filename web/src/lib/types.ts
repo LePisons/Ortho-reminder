@@ -19,6 +19,9 @@ export interface Patient {
   lastAppointmentDate?: string | null;
   urgencyStatus?: 'ON_TRACK' | 'ENDING_SOON' | 'OVERDUE' | 'AWAITING_REEVALUATION';
   observations?: string;
+  clinic?: string;
+  doctor?: string;
+  dentalinkId?: number | null;
   createdAt: string;
   updatedAt: string;
   clinicalRecords?: ClinicalRecord[];

@@ -7,6 +7,7 @@ import { Patient, AlignerBatch, PatientImage } from "@/lib/types";
 import { PatientInfoCard } from "@/components/features/patients/patient-info-card";
 import { PatientSummaryCard } from "@/components/features/patients/patient-summary-card";
 import { AlignerProgress } from "@/components/features/patients/aligner-progress";
+import { PatientControlesCard } from "@/components/features/patients/patient-controles-card";
 import { PipelineStageSelector } from "@/components/features/patients/pipeline-stage-selector";
 import { ClinicalTab } from "@/components/features/clinical/clinical-tab";
 import { ImagesTab } from "@/components/features/clinical/images-tab";
@@ -195,6 +196,9 @@ export default function PatientDetailsPage() {
               </p>
             )}
           </div>
+
+          {/* Controles — Dentalink link + last two clinical histories */}
+          <PatientControlesCard patient={patient} onUpdate={fetchPatient} />
 
           {/* Aligner Tracking Progress */}
           <AlignerProgress patient={patient} onUpdate={fetchPatient} />

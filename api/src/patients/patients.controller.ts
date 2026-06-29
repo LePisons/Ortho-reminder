@@ -117,6 +117,11 @@ export class PatientsController {
     return this.patientsService.searchPatients(q || '', req.user.userId);
   }
 
+  @Get('field-suggestions')
+  getFieldSuggestions(@Request() req) {
+    return this.patientsService.getFieldSuggestions(req.user.userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
     return this.patientsService.findOne(id, req.user.userId);

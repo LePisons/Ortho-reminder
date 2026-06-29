@@ -7,9 +7,11 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Request,
 } from '@nestjs/common';
 import { ControlSummary, DentalinkService } from './dentalink.service';
 import { AddDentalinkPatientDto } from './dto/add-dentalink-patient.dto';
+import { LinkDentalinkPatientDto } from './dto/link-dentalink-patient.dto';
 
 @Controller('dentalink')
 export class DentalinkController {
@@ -83,6 +85,29 @@ export class DentalinkController {
   @Get('patients/:id/history')
   getPatientHistory(@Param('id', ParseIntPipe) id: number) {
     return this.dentalink.getPatientHistory(id);
+  }
+
+  /** Live control summary for one patient (used on the patient profile page). */
+  @Get('patients/:id/summary')
+  getPatientSummary(@Param('id', ParseIntPipe) id: number) {
+    return this.dentalink.getPatientSummary(id);
+  }
+
+  /** Link an internal patient to a Dentalink ID (also adds to the roster). */
+  @Post('link')
+  linkPatient(@Body() dto: LinkDentalinkPatientDto, @Request() req) {
+    return this.dentalink.linkPatient(
+      dto.patientId,
+      dto.dentalinkId,
+      req.user.userId,
+    );
+  }
+
+  /** Unlink an internal patient from Dentalink. */
+  @Delete('link/:patientId')
+  async unlinkPatient(@Param('patientId') patientId: string, @Request() req) {
+    await this.dentalink.unlinkPatient(patientId, req.user.userId);
+    return { ok: true };
   }
 
   private buildStats(pacientes: ControlSummary[]) {

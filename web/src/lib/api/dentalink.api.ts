@@ -67,6 +67,42 @@ export const DentalinkApi = {
     return res.json();
   },
 
+  getPatientSummary: async (id: number): Promise<ControlSummary> => {
+    const res = await fetch(`${API_URL}/dentalink/patients/${id}/summary`, {
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Failed to fetch patient summary");
+    return res.json();
+  },
+
+  linkPatient: async (input: {
+    patientId: string;
+    dentalinkId: number;
+  }): Promise<ControlSummary> => {
+    const res = await fetch(`${API_URL}/dentalink/link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const msg = await res
+        .json()
+        .then((b) => (Array.isArray(b?.message) ? b.message.join(", ") : b?.message))
+        .catch(() => null);
+      throw new Error(msg || "No se pudo vincular el paciente");
+    }
+    return res.json();
+  },
+
+  unlinkPatient: async (patientId: string): Promise<void> => {
+    const res = await fetch(`${API_URL}/dentalink/link/${patientId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("No se pudo desvincular el paciente");
+  },
+
   listPatients: async (): Promise<RosterPatient[]> => {
     const res = await fetch(`${API_URL}/dentalink/patients`, {
       credentials: "include",
