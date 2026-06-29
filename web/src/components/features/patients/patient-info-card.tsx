@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Patient } from "@/lib/types";
-import { Calendar, Mail, Phone, User, Edit } from "lucide-react";
+import { Calendar, Mail, Phone, User, Edit, Building2, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { API_URL } from "@/lib/utils";
 import { QRCodeSVG } from 'qrcode.react';
@@ -104,6 +104,22 @@ export function PatientInfoCard({ patient, onUpdate }: PatientInfoCardProps) {
                 <User className="h-4 w-4" />
                 RUT: {patient.rut}
               </p>
+              {(patient.clinic || patient.doctor) && (
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
+                  {patient.clinic && (
+                    <span className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      {patient.clinic}
+                    </span>
+                  )}
+                  {patient.doctor && (
+                    <span className="flex items-center gap-2">
+                      <Stethoscope className="h-4 w-4" />
+                      {patient.doctor}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-center">

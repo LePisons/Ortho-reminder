@@ -32,6 +32,29 @@ export class PatientsService {
     return patient;
   }
 
+  // Distinct clinic/doctor values already used by this user, for autocomplete
+  // when creating/editing a patient.
+  async getFieldSuggestions(userId: string) {
+    const [clinicRows, doctorRows] = await Promise.all([
+      this.prisma.patient.findMany({
+        where: { userId, deletedAt: null, clinic: { not: null } },
+        distinct: ['clinic'],
+        select: { clinic: true },
+        orderBy: { clinic: 'asc' },
+      }),
+      this.prisma.patient.findMany({
+        where: { userId, deletedAt: null, doctor: { not: null } },
+        distinct: ['doctor'],
+        select: { doctor: true },
+        orderBy: { doctor: 'asc' },
+      }),
+    ]);
+    return {
+      clinics: clinicRows.map((r) => r.clinic).filter((v): v is string => !!v),
+      doctors: doctorRows.map((r) => r.doctor).filter((v): v is string => !!v),
+    };
+  }
+
   // Stored avatar/image values are R2 object keys; legacy rows hold an absolute
   // http(s) URL from the old disk storage. Sign keys, pass legacy URLs through.
   private async signStoredUrl(value?: string | null): Promise<string | null | undefined> {

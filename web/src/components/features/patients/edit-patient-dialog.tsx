@@ -1,7 +1,8 @@
 "use client";
 import { toast } from "sonner";
 import { API_URL } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { PatientsApi } from "@/lib/api/patients.api";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +48,21 @@ export function EditPatientDialog({
 }: EditPatientDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Previously-used clinic/doctor values, for autocomplete suggestions.
+  const [suggestions, setSuggestions] = useState<{
+    clinics: string[];
+    doctors: string[];
+  }>({ clinics: [], doctors: [] });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    PatientsApi.getFieldSuggestions()
+      .then(setSuggestions)
+      .catch(() => {
+        /* suggestions are best-effort; ignore failures */
+      });
+  }, [isOpen]);
+
   // 2. Set up the form with default values from the patient prop
   const form = useForm({
     defaultValues: {
@@ -54,6 +70,8 @@ export function EditPatientDialog({
       rut: patient.rut,
       email: patient.email,
       phone: patient.phone,
+      clinic: patient.clinic ?? "",
+      doctor: patient.doctor ?? "",
       status: patient.status,
       // Format the incoming date string to be compatible with <input type="date">
       treatmentStartDate: new Date(patient.treatmentStartDate)
@@ -69,7 +87,10 @@ export function EditPatientDialog({
   async function onSubmit(values: Record<string, unknown>) {
     // Sync wearDaysPerAligner with changeFrequency
     values.wearDaysPerAligner = values.changeFrequency;
-    
+    // Don't persist blank clinic/doctor (keeps autocomplete suggestions clean).
+    if (typeof values.clinic === "string" && !values.clinic.trim()) values.clinic = null;
+    if (typeof values.doctor === "string" && !values.doctor.trim()) values.doctor = null;
+
     try {
       // 3a. Pre-flight Duplication Check
       const checkRes = await fetch(`${API_URL}/patients/check-duplicates`, {
@@ -192,6 +213,50 @@ export function EditPatientDialog({
                   <FormControl>
                     <Input placeholder="+56912345678" type="tel" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="clinic"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Clinic (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Referring dental office"
+                      list="clinic-suggestions"
+                      {...field}
+                    />
+                  </FormControl>
+                  <datalist id="clinic-suggestions">
+                    {suggestions.clinics.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="doctor"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Doctor (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Referring colleague / dentist"
+                      list="doctor-suggestions"
+                      {...field}
+                    />
+                  </FormControl>
+                  <datalist id="doctor-suggestions">
+                    {suggestions.doctors.map((d) => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
                   <FormMessage />
                 </FormItem>
               )}

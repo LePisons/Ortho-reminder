@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -218,78 +219,7 @@ export class DentalinkService implements OnModuleInit {
 
     for (const { id, nombre } of this.patients) {
       try {
-        const citas = await this.getAll(`${BASE}/pacientes/${id}/citas`);
-        let proximo: DentalinkCita | null = null;
-        const atendidas: DentalinkCita[] = [];
-
-        for (const c of citas) {
-          if (!c.fecha) continue;
-          const fdate = toLocalDate(c.fecha);
-          if (fdate >= today && c.estado_cita !== 'Anulado') {
-            if (proximo === null || fdate < toLocalDate(proximo.fecha!)) proximo = c;
-          }
-          if (c.estado_cita === 'Atendido') atendidas.push(c);
-        }
-
-        // Newest attended visit first.
-        atendidas.sort(
-          (a, b) => toLocalDate(b.fecha!).getTime() - toLocalDate(a.fecha!).getTime(),
-        );
-
-        const ultimo: DentalinkCita | null = atendidas[0] ?? null;
-
-        // Evolution notes are NOT attached to a cita's /detalles (that array is
-        // always empty); they live on /pacientes/{id}/evoluciones and are linked
-        // to an appointment only by date. Fetch them once and join by `fecha`.
-        const evoluciones = await this.fetchEvoluciones(id);
-
-        // All notes recorded on a given appointment date, joined into one string.
-        const resumenForDate = (fecha?: string): string | null => {
-          if (!fecha) return null;
-          const txt = evoluciones
-            .filter((e) => e.fecha === fecha)
-            .map((e) => e.datos)
-            .join(' | ');
-          return txt || null;
-        };
-
-        const resumenUltimo = ultimo ? resumenForDate(ultimo.fecha) : null;
-
-        // Most recent note overall (evoluciones is sorted newest-first and only
-        // contains non-empty notes), used to surface the last visit where the
-        // clinician actually wrote something.
-        let ultimoConRegistro: DentalinkCita | null = null;
-        let resumenUltimoConRegistro: string | null = null;
-        const evoLast = evoluciones[0] ?? null;
-        if (evoLast) {
-          // Prefer enriching with the matching appointment (attended first) so
-          // the date/time/estado display correctly; fall back to a date-only stub.
-          const citaMatch =
-            atendidas.find((c) => c.fecha === evoLast.fecha) ??
-            citas.find((c) => c.fecha === evoLast.fecha) ??
-            null;
-          ultimoConRegistro =
-            citaMatch ?? ({ id: -evoLast.id, fecha: evoLast.fecha } as DentalinkCita);
-          resumenUltimoConRegistro = resumenForDate(evoLast.fecha);
-        }
-
-        let diasRestantes: number | null = null;
-        if (proximo) {
-          diasRestantes = Math.round(
-            (toLocalDate(proximo.fecha!).getTime() - today.getTime()) / 86_400_000,
-          );
-        }
-
-        result.pacientes.push({
-          id,
-          nombre,
-          proximoControl: proximo,
-          diasRestantes,
-          ultimoControl: ultimo,
-          resumenUltimo,
-          ultimoControlConRegistro: ultimoConRegistro,
-          resumenUltimoConRegistro,
-        });
+        result.pacientes.push(await this.buildSummary(id, nombre));
       } catch (e) {
         result.errores.push({
           id,
@@ -308,6 +238,105 @@ export class DentalinkService implements OnModuleInit {
     });
 
     return result;
+  }
+
+  /**
+   * Compute the control summary (next/last appointment + evolution notes) for a
+   * single Dentalink patient. Shared by the full Controles report and the
+   * per-patient lookup used on the patient profile page.
+   */
+  private async buildSummary(
+    id: number,
+    nombre: string,
+  ): Promise<ControlSummary> {
+    const today = todayMidnight();
+    const citas = await this.getAll(`${BASE}/pacientes/${id}/citas`);
+    let proximo: DentalinkCita | null = null;
+    const atendidas: DentalinkCita[] = [];
+
+    for (const c of citas) {
+      if (!c.fecha) continue;
+      const fdate = toLocalDate(c.fecha);
+      if (fdate >= today && c.estado_cita !== 'Anulado') {
+        if (proximo === null || fdate < toLocalDate(proximo.fecha!)) proximo = c;
+      }
+      if (c.estado_cita === 'Atendido') atendidas.push(c);
+    }
+
+    // Newest attended visit first.
+    atendidas.sort(
+      (a, b) => toLocalDate(b.fecha!).getTime() - toLocalDate(a.fecha!).getTime(),
+    );
+
+    const ultimo: DentalinkCita | null = atendidas[0] ?? null;
+
+    // Evolution notes are NOT attached to a cita's /detalles (that array is
+    // always empty); they live on /pacientes/{id}/evoluciones and are linked
+    // to an appointment only by date. Fetch them once and join by `fecha`.
+    const evoluciones = await this.fetchEvoluciones(id);
+
+    // All notes recorded on a given appointment date, joined into one string.
+    const resumenForDate = (fecha?: string): string | null => {
+      if (!fecha) return null;
+      const txt = evoluciones
+        .filter((e) => e.fecha === fecha)
+        .map((e) => e.datos)
+        .join(' | ');
+      return txt || null;
+    };
+
+    const resumenUltimo = ultimo ? resumenForDate(ultimo.fecha) : null;
+
+    // Most recent note overall (evoluciones is sorted newest-first and only
+    // contains non-empty notes), used to surface the last visit where the
+    // clinician actually wrote something.
+    let ultimoConRegistro: DentalinkCita | null = null;
+    let resumenUltimoConRegistro: string | null = null;
+    const evoLast = evoluciones[0] ?? null;
+    if (evoLast) {
+      // Prefer enriching with the matching appointment (attended first) so
+      // the date/time/estado display correctly; fall back to a date-only stub.
+      const citaMatch =
+        atendidas.find((c) => c.fecha === evoLast.fecha) ??
+        citas.find((c) => c.fecha === evoLast.fecha) ??
+        null;
+      ultimoConRegistro =
+        citaMatch ?? ({ id: -evoLast.id, fecha: evoLast.fecha } as DentalinkCita);
+      resumenUltimoConRegistro = resumenForDate(evoLast.fecha);
+    }
+
+    let diasRestantes: number | null = null;
+    if (proximo) {
+      diasRestantes = Math.round(
+        (toLocalDate(proximo.fecha!).getTime() - today.getTime()) / 86_400_000,
+      );
+    }
+
+    return {
+      id,
+      nombre,
+      proximoControl: proximo,
+      diasRestantes,
+      ultimoControl: ultimo,
+      resumenUltimo,
+      ultimoControlConRegistro: ultimoConRegistro,
+      resumenUltimoConRegistro,
+    };
+  }
+
+  /**
+   * Live control summary for a single patient (not roster-cached). Used by the
+   * patient profile page to show the last two clinical histories.
+   */
+  async getPatientSummary(id: number): Promise<ControlSummary> {
+    if (!this.token) {
+      throw new BadRequestException(
+        'La integración con Dentalink no está configurada (falta DENTALINK_TOKEN).',
+      );
+    }
+    const known = this.patients.find((p) => p.id === id);
+    const nombre = known?.nombre ?? (await this.fetchPatientName(id));
+    return this.buildSummary(id, nombre);
   }
 
   /**
@@ -378,6 +407,48 @@ export class DentalinkService implements OnModuleInit {
     await this.prisma.dentalinkPatient.deleteMany({ where: { id } });
     this.patients = await this.loadPatients();
     this.invalidateCache();
+  }
+
+  /**
+   * Link an internal patient to a Dentalink ID: adds them to the Controles
+   * roster and stores the id on the Patient record. Returns the fresh summary.
+   */
+  async linkPatient(
+    patientId: string,
+    dentalinkId: number,
+    userId: string,
+  ): Promise<ControlSummary> {
+    await this.assertPatientOwnership(patientId, userId);
+    // Upsert into the roster (also resolves the name + invalidates the cache).
+    const { nombre } = await this.addPatient(dentalinkId);
+    await this.prisma.patient.update({
+      where: { id: patientId },
+      data: { dentalinkId },
+    });
+    return this.buildSummary(dentalinkId, nombre);
+  }
+
+  /** Unlink an internal patient from Dentalink (roster entry is left intact). */
+  async unlinkPatient(patientId: string, userId: string): Promise<void> {
+    await this.assertPatientOwnership(patientId, userId);
+    await this.prisma.patient.update({
+      where: { id: patientId },
+      data: { dentalinkId: null },
+    });
+  }
+
+  /** Verify the patient exists and belongs to the requesting user. */
+  private async assertPatientOwnership(patientId: string, userId: string) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+    });
+    if (!patient || patient.deletedAt) {
+      throw new NotFoundException('Patient not found');
+    }
+    if (patient.userId !== userId) {
+      throw new ForbiddenException();
+    }
+    return patient;
   }
 
   private invalidateCache() {

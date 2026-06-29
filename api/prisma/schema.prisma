@@ -62,6 +62,9 @@ model Patient {
   diagnosis          String?
   treatmentPlan      String?
   observations       String?
+  clinic             String?       // referring dental office
+  doctor             String?       // referring colleague / dentist
+  dentalinkId        Int?          // links to the Dentalink patient ID (Controles + clinical history)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   deletedAt          DateTime?     // soft delete; non-null rows are hidden from queries
@@ -85,6 +88,8 @@ model Patient {
   @@unique([userId, email])
   @@unique([userId, phone])
   @@index([userId])
+  @@index([userId, clinic])
+  @@index([userId, doctor])
 }
 
 model ClinicalRecord {

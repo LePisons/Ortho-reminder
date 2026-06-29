@@ -24,8 +24,9 @@ import {
   FormMessage,
 } from "@/components/ui/form"; // Shadcn's Form components
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatRut } from "@/lib/format-rut";
+import { PatientsApi } from "@/lib/api/patients.api";
 
 // defines the props interface
 
@@ -46,6 +47,21 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
 
   const [isOpen, setIsOpen] = useState(false);
 
+  // Previously-used clinic/doctor values, for autocomplete suggestions.
+  const [suggestions, setSuggestions] = useState<{
+    clinics: string[];
+    doctors: string[];
+  }>({ clinics: [], doctors: [] });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    PatientsApi.getFieldSuggestions()
+      .then(setSuggestions)
+      .catch(() => {
+        /* suggestions are best-effort; ignore failures */
+      });
+  }, [isOpen]);
+
   const form = useForm({
     // We can add validation rules here later with Zod
     defaultValues: {
@@ -53,6 +69,8 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
       rut: "",
       email: "",
       phone: "",
+      clinic: "",
+      doctor: "",
       changeFrequency: 14, // Default to 14 as per old requirement
       totalAligners: 0,
       currentAligner: 1,
@@ -65,6 +83,9 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
   async function onSubmit(values: Record<string, unknown>) {
     // Sync wearDaysPerAligner with changeFrequency since they represent the same thing
     values.wearDaysPerAligner = values.changeFrequency;
+    // Don't persist blank clinic/doctor (keeps autocomplete suggestions clean).
+    if (typeof values.clinic === "string" && !values.clinic.trim()) delete values.clinic;
+    if (typeof values.doctor === "string" && !values.doctor.trim()) delete values.doctor;
     try {
       // 2a. Pre-flight Duplication Check
       const checkRes = await fetch(`${API_URL}/patients/check-duplicates`, {
@@ -210,6 +231,50 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
                   <FormControl>
                     <Input placeholder="+56912345678" type="tel" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="clinic"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Clinic (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Referring dental office"
+                      list="clinic-suggestions"
+                      {...field}
+                    />
+                  </FormControl>
+                  <datalist id="clinic-suggestions">
+                    {suggestions.clinics.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="doctor"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Doctor (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Referring colleague / dentist"
+                      list="doctor-suggestions"
+                      {...field}
+                    />
+                  </FormControl>
+                  <datalist id="doctor-suggestions">
+                    {suggestions.doctors.map((d) => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
                   <FormMessage />
                 </FormItem>
               )}

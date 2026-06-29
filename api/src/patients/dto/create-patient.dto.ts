@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -70,4 +71,14 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   observations?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  clinic?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  doctor?: string;
 }
