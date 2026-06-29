@@ -31,7 +31,7 @@ export class AuthController {
     const { access_token, user } = await this.authService.login(req.user);
     res.cookie('access_token', access_token, {
       ...authCookieOptions,
-      maxAge: 3600000, // 1 hour
+      maxAge: 12 * 60 * 60 * 1000, // 12 hours (keep in sync with JWT expiresIn)
     });
     return { user };
   }
