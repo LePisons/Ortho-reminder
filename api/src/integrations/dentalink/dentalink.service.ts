@@ -507,10 +507,7 @@ export class DentalinkService implements OnModuleInit {
    * Add (or update) a patient in the roster. When `nombre` is omitted it is
    * resolved from Dentalink using the ID, so the user only needs the ID.
    */
-  async addPatient(
-    id: number,
-    nombre?: string,
-  ): Promise<{ id: number; nombre: string }> {
+  async addPatient(id: number, nombre?: string): Promise<ControlSummary> {
     if (!this.token) {
       throw new BadRequestException(
         'La integración con Dentalink no está configurada (falta DENTALINK_TOKEN).',
@@ -523,9 +520,11 @@ export class DentalinkService implements OnModuleInit {
       update: { nombre: resolved },
     });
     this.patients = await this.loadPatients();
-    this.forgetPatient(id); // re-resolve this patient's data on the next load
+    this.forgetPatient(id); // drop any stale cached data for this patient
     this.invalidateReport(); // surface the new patient on the next report load
-    return { id: saved.id, nombre: saved.nombre };
+    // Build + cache this patient's summary now so it appears instantly in the
+    // Controles list and on the patient page without another Dentalink fetch.
+    return this.getSummaryCached(saved.id, saved.nombre, true);
   }
 
   /** Remove a patient from the roster. */
@@ -546,14 +545,14 @@ export class DentalinkService implements OnModuleInit {
     userId: string,
   ): Promise<ControlSummary> {
     await this.assertPatientOwnership(patientId, userId);
-    // Upsert into the roster (also resolves the name + invalidates the cache).
-    const { nombre } = await this.addPatient(dentalinkId);
+    // Upsert into the roster — this also resolves the name, invalidates the
+    // report cache, and warms (returns) the patient's summary in one go.
+    const summary = await this.addPatient(dentalinkId);
     await this.prisma.patient.update({
       where: { id: patientId },
       data: { dentalinkId },
     });
-    // Fetch once and warm the shared cache so the patient page is instant.
-    return this.getSummaryCached(dentalinkId, nombre, true);
+    return summary;
   }
 
   /** Unlink an internal patient from Dentalink (roster entry is left intact). */

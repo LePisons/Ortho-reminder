@@ -44,10 +44,11 @@ function diasBadge(dias: number | null) {
 
 interface PatientControlesCardProps {
   patient: Patient;
-  onUpdate: () => void;
+  /** Apply a shallow patch to the patient in place (no full refetch). */
+  onPatch: (patch: Partial<Patient>) => void;
 }
 
-export function PatientControlesCard({ patient, onUpdate }: PatientControlesCardProps) {
+export function PatientControlesCard({ patient, onPatch }: PatientControlesCardProps) {
   const dentalinkId = patient.dentalinkId ?? null;
 
   const [summary, setSummary] = useState<ControlSummary | null>(null);
@@ -88,11 +89,17 @@ export function PatientControlesCard({ patient, onUpdate }: PatientControlesCard
     }
     setLinking(true);
     try {
-      await DentalinkApi.linkPatient({ patientId: patient.id, dentalinkId: parsedId });
+      // linkPatient returns the warm summary — render it immediately and patch
+      // the patient in place (no full refetch, no image re-signing).
+      const linked = await DentalinkApi.linkPatient({
+        patientId: patient.id,
+        dentalinkId: parsedId,
+      });
+      setSummary(linked);
+      onPatch({ dentalinkId: parsedId });
       toast.success("Paciente agregado a controles");
       setLinkOpen(false);
       setIdInput("");
-      onUpdate();
     } catch (err) {
       toast.error("No se pudo vincular", {
         description: err instanceof Error ? err.message : "Error desconocido",
@@ -112,8 +119,9 @@ export function PatientControlesCard({ patient, onUpdate }: PatientControlesCard
     setUnlinking(true);
     try {
       await DentalinkApi.unlinkPatient(patient.id);
+      setSummary(null);
+      onPatch({ dentalinkId: null });
       toast.success("Paciente desvinculado de controles");
-      onUpdate();
     } catch {
       toast.error("No se pudo desvincular");
     } finally {
@@ -233,7 +241,7 @@ export function PatientControlesCard({ patient, onUpdate }: PatientControlesCard
       </div>
 
       <div className="p-5">
-        {loading ? (
+        {loading && !summary ? (
           <div className="flex items-center gap-2 text-xs text-gray-400 py-4 justify-center">
             <Loader2 className="w-4 h-4 animate-spin" />
             Cargando controles…

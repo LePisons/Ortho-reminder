@@ -8,6 +8,7 @@ import {
   CalendarX,
   ChevronDown,
   Inbox,
+  Loader2,
   RefreshCw,
   Search,
   Stethoscope,
@@ -223,6 +224,7 @@ export default function ControlesPage() {
   const [data, setData] = useState<ControlesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
@@ -267,6 +269,18 @@ export default function ControlesPage() {
     load();
   }, [load]);
 
+  // Roster add/remove: rebuild the list from the warm per-patient caches (only
+  // the newly added patient is fetched from Dentalink) with a soft, non-blocking
+  // indicator — the list stays visible the whole time.
+  const handleRosterChanged = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await load(false);
+    } finally {
+      setSyncing(false);
+    }
+  }, [load]);
+
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
@@ -277,13 +291,21 @@ export default function ControlesPage() {
           <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B]">
             Controles
           </h1>
-          <p className="text-[#7c7c84] mt-1.5">
-            Próximos controles e historial de pacientes (Dentalink)
-            {data?.fechaReporte ? ` · ${data.fechaReporte}` : ""}
+          <p className="text-[#7c7c84] mt-1.5 flex items-center gap-2">
+            <span>
+              Próximos controles e historial de pacientes (Dentalink)
+              {data?.fechaReporte ? ` · ${data.fechaReporte}` : ""}
+            </span>
+            {syncing && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6469FC]">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Actualizando…
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <ManageDentalinkPatientsDialog onChanged={() => load(true)} />
+          <ManageDentalinkPatientsDialog onChanged={handleRosterChanged} />
           <Button
             variant="outline"
             size="sm"

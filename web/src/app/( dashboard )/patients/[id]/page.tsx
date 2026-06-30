@@ -63,6 +63,13 @@ export default function PatientDetailsPage() {
     []
   );
 
+  // Apply a shallow patch to the patient in place (e.g. linking Dentalink) so we
+  // don't refetch the whole patient — which would re-sign and re-download every
+  // image — just to flip a single field.
+  const patchPatient = useCallback((patch: Partial<Patient>) => {
+    setPatient((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
   const handleStatusChange = async (batchId: string, action: string, payload?: unknown) => {
     try {
       const response = await fetch(`${API_URL}/aligner-batches/${batchId}/${action}`, {
@@ -198,7 +205,7 @@ export default function PatientDetailsPage() {
           </div>
 
           {/* Controles — Dentalink link + last two clinical histories */}
-          <PatientControlesCard patient={patient} onUpdate={fetchPatient} />
+          <PatientControlesCard patient={patient} onPatch={patchPatient} />
 
           {/* Aligner Tracking Progress */}
           <AlignerProgress patient={patient} onUpdate={fetchPatient} />

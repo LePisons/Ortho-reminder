@@ -114,7 +114,7 @@ export const DentalinkApi = {
   addPatient: async (input: {
     id: number;
     nombre?: string;
-  }): Promise<RosterPatient> => {
+  }): Promise<ControlSummary> => {
     const res = await fetch(`${API_URL}/dentalink/patients`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

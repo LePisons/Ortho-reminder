@@ -61,7 +61,13 @@ export function ManageDentalinkPatientsDialog({
       toast.success("Paciente agregado", { description: added.nombre });
       setId("");
       setNombre("");
-      loadRoster();
+      // Update the roster in place instead of refetching the whole list.
+      setRoster((prev) =>
+        [
+          ...prev.filter((p) => p.id !== added.id),
+          { id: added.id, nombre: added.nombre },
+        ].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      );
       onChanged();
     } catch (err) {
       toast.error("No se pudo agregar", {
@@ -83,7 +89,8 @@ export function ManageDentalinkPatientsDialog({
     try {
       await DentalinkApi.removePatient(patient.id);
       toast.success("Paciente eliminado");
-      loadRoster();
+      // Remove from the roster in place instead of refetching the whole list.
+      setRoster((prev) => prev.filter((p) => p.id !== patient.id));
       onChanged();
     } catch {
       toast.error("No se pudo eliminar el paciente");
