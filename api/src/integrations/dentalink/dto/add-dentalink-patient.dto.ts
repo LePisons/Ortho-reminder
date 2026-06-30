@@ -14,4 +14,10 @@ export class AddDentalinkPatientDto {
   @IsString()
   @MaxLength(120)
   nombre?: string;
+
+  /** Clinic key the patient belongs to (defaults to the primary clinic). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  clinic?: string;
 }

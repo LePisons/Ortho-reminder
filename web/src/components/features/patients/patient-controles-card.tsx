@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   DentalinkApi,
+  type Clinic,
   type ControlSummary,
   type DentalinkCita,
 } from "@/lib/api/dentalink.api";
@@ -50,6 +51,7 @@ interface PatientControlesCardProps {
 
 export function PatientControlesCard({ patient, onPatch }: PatientControlesCardProps) {
   const dentalinkId = patient.dentalinkId ?? null;
+  const dentalinkClinic = patient.dentalinkClinic ?? null;
 
   const [summary, setSummary] = useState<ControlSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,14 +60,16 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
   // Link dialog state
   const [linkOpen, setLinkOpen] = useState(false);
   const [idInput, setIdInput] = useState("");
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [clinicInput, setClinicInput] = useState("");
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
 
-  const loadSummary = useCallback(async (id: number) => {
+  const loadSummary = useCallback(async (id: number, clinic: string | null) => {
     setLoading(true);
     setError(null);
     try {
-      setSummary(await DentalinkApi.getPatientSummary(id));
+      setSummary(await DentalinkApi.getPatientSummary(id, clinic ?? undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar los controles");
     } finally {
@@ -74,9 +78,24 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
   }, []);
 
   useEffect(() => {
-    if (dentalinkId) loadSummary(dentalinkId);
+    if (dentalinkId) loadSummary(dentalinkId, dentalinkClinic);
     else setSummary(null);
-  }, [dentalinkId, loadSummary]);
+  }, [dentalinkId, dentalinkClinic, loadSummary]);
+
+  // Load the clinic options lazily, only when the link dialog opens.
+  useEffect(() => {
+    if (!linkOpen || clinics.length > 0) return;
+    DentalinkApi.listClinics()
+      .then((list) => {
+        setClinics(list);
+        setClinicInput(
+          (cur) => cur || (list.find((c) => c.available) ?? list[0])?.key || "",
+        );
+      })
+      .catch(() => {
+        /* selector simply won't render; link still defaults server-side */
+      });
+  }, [linkOpen, clinics.length]);
 
   const handleLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,12 +110,14 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
     try {
       // linkPatient returns the warm summary — render it immediately and patch
       // the patient in place (no full refetch, no image re-signing).
+      const clinic = clinicInput || undefined;
       const linked = await DentalinkApi.linkPatient({
         patientId: patient.id,
         dentalinkId: parsedId,
+        clinic,
       });
       setSummary(linked);
-      onPatch({ dentalinkId: parsedId });
+      onPatch({ dentalinkId: parsedId, dentalinkClinic: clinic ?? null });
       toast.success("Paciente agregado a controles");
       setLinkOpen(false);
       setIdInput("");
@@ -120,7 +141,7 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
     try {
       await DentalinkApi.unlinkPatient(patient.id);
       setSummary(null);
-      onPatch({ dentalinkId: null });
+      onPatch({ dentalinkId: null, dentalinkClinic: null });
       toast.success("Paciente desvinculado de controles");
     } catch {
       toast.error("No se pudo desvincular");
@@ -178,6 +199,25 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
                   autoFocus
                 />
               </div>
+              {clinics.length > 1 && (
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                    Clínica
+                  </label>
+                  <select
+                    value={clinicInput}
+                    onChange={(e) => setClinicInput(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6469FC]/30 focus:border-[#6469FC]"
+                  >
+                    {clinics.map((c) => (
+                      <option key={c.key} value={c.key} disabled={!c.available}>
+                        {c.nombre}
+                        {c.available ? "" : " (sin token)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <DialogFooter>
                 <Button
                   type="submit"

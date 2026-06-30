@@ -65,6 +65,7 @@ model Patient {
   clinic             String?       // referring dental office
   doctor             String?       // referring colleague / dentist
   dentalinkId        Int?          // links to the Dentalink patient ID (Controles + clinical history)
+  dentalinkClinic    String?       // which Dentalink clinic account `dentalinkId` belongs to
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   deletedAt          DateTime?     // soft delete; non-null rows are hidden from queries
@@ -383,9 +384,15 @@ model OnboardingToken {
 
 // Roster of Dentalink patients surfaced on the Controles page. `id` is the
 // Dentalink patient ID (not a local cuid) so it maps directly to their API.
-// Seeded once from the DENTALINK_PATIENT_IDS env var, then editable at runtime.
+// Each row is scoped to a clinic because the two clinics are separate Dentalink
+// accounts with independent ID spaces (the same numeric id can exist in both),
+// so the primary key is composite. Seeded once per clinic from the
+// DENTALINK_PATIENT_IDS[_<CLINIC>] env vars, then editable at runtime.
 model DentalinkPatient {
-  id        Int      @id
+  id        Int
+  clinic    String   @default("quiero-frenillos")
   nombre    String
   createdAt DateTime @default(now())
+
+  @@id([clinic, id])
 }

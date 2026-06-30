@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -20,6 +20,7 @@ import { PaginationControls } from "@/components/features/patients/pagination-co
 import { ManageDentalinkPatientsDialog } from "@/components/features/controles/manage-dentalink-patients-dialog";
 import {
   DentalinkApi,
+  type Clinic,
   type ControlSummary,
   type ControlesFilter,
   type ControlesResponse,
@@ -89,21 +90,27 @@ function StatCard({
   );
 }
 
-function HistoryDetail({ patientId }: { patientId: number }) {
+function HistoryDetail({
+  patientId,
+  clinic,
+}: {
+  patientId: number;
+  clinic: string;
+}) {
   const [history, setHistory] = useState<PatientHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    DentalinkApi.getPatientHistory(patientId)
+    DentalinkApi.getPatientHistory(patientId, clinic)
       .then((h) => active && setHistory(h))
       .catch(() => active && setError("No se pudo cargar el historial"))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [patientId]);
+  }, [patientId, clinic]);
 
   if (loading)
     return (
@@ -141,7 +148,7 @@ function HistoryDetail({ patientId }: { patientId: number }) {
   );
 }
 
-function ControlRow({ p }: { p: ControlSummary }) {
+function ControlRow({ p, clinic }: { p: ControlSummary; clinic: string }) {
   const [expanded, setExpanded] = useState(false);
   const alerta = p.diasRestantes !== null && p.diasRestantes <= 7;
   const badge = diasBadge(p.diasRestantes);
@@ -212,7 +219,7 @@ function ControlRow({ p }: { p: ControlSummary }) {
                 </div>
               )}
 
-            <HistoryDetail patientId={p.id} />
+            <HistoryDetail patientId={p.id} clinic={clinic} />
           </div>
         </div>
       )}
@@ -221,6 +228,8 @@ function ControlRow({ p }: { p: ControlSummary }) {
 }
 
 export default function ControlesPage() {
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [clinic, setClinic] = useState<string>("");
   const [data, setData] = useState<ControlesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -230,6 +239,25 @@ export default function ControlesPage() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<ControlesFilter | null>(null);
 
+  // Per-(clinic + query) response cache. Switching between tabs that were
+  // already loaded with the same search/filter/page is instant and makes no
+  // network request at all; the backend itself also caches Dentalink calls.
+  const responseCache = useRef<Map<string, ControlesResponse>>(new Map());
+  const cacheKey = `${clinic}|${debounced}|${filter ?? ""}|${page}`;
+
+  // Load the clinic tabs once and default to the first available one.
+  useEffect(() => {
+    DentalinkApi.listClinics()
+      .then((list) => {
+        setClinics(list);
+        setClinic((cur) => cur || (list.find((c) => c.available) ?? list[0])?.key || "");
+      })
+      .catch((e) => {
+        console.error("Failed to fetch clinics:", e);
+        setLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 350);
     return () => clearTimeout(t);
@@ -237,7 +265,7 @@ export default function ControlesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debounced, filter]);
+  }, [debounced, filter, clinic]);
 
   // Clicking a stat card toggles its filter; clicking the active one clears it.
   const toggleFilter = (next: ControlesFilter | null) =>
@@ -245,6 +273,16 @@ export default function ControlesPage() {
 
   const load = useCallback(
     async (refresh = false) => {
+      if (!clinic) return;
+      // Serve an unchanged tab from the page cache — no request needed.
+      if (!refresh) {
+        const cached = responseCache.current.get(cacheKey);
+        if (cached) {
+          setData(cached);
+          setLoading(false);
+          return;
+        }
+      }
       try {
         if (refresh) setRefreshing(true);
         const res = await DentalinkApi.getControles({
@@ -253,7 +291,9 @@ export default function ControlesPage() {
           pageSize: PAGE_SIZE,
           refresh,
           filter: filter ?? undefined,
+          clinic,
         });
+        responseCache.current.set(cacheKey, res);
         setData(res);
       } catch (e) {
         console.error("Failed to fetch controles:", e);
@@ -262,24 +302,45 @@ export default function ControlesPage() {
         setRefreshing(false);
       }
     },
-    [debounced, page, filter],
+    [debounced, page, filter, clinic, cacheKey],
   );
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Roster add/remove: rebuild the list from the warm per-patient caches (only
-  // the newly added patient is fetched from Dentalink) with a soft, non-blocking
+  // Roster add/remove: only the active clinic's cached responses are stale, so
+  // drop them and rebuild from the warm per-patient caches (only the newly
+  // added patient is fetched from Dentalink) with a soft, non-blocking
   // indicator — the list stays visible the whole time.
   const handleRosterChanged = useCallback(async () => {
     setSyncing(true);
+    for (const key of [...responseCache.current.keys()]) {
+      if (key.startsWith(`${clinic}|`)) responseCache.current.delete(key);
+    }
     try {
       await load(false);
     } finally {
       setSyncing(false);
     }
-  }, [load]);
+  }, [load, clinic]);
+
+  // A manual refresh must bypass the page cache for the active clinic too.
+  const handleRefresh = useCallback(() => {
+    for (const key of [...responseCache.current.keys()]) {
+      if (key.startsWith(`${clinic}|`)) responseCache.current.delete(key);
+    }
+    load(true);
+  }, [load, clinic]);
+
+  // Switching tabs shows a brief spinner only when that clinic isn't cached yet;
+  // cached clinics still render without any network request (see `load`).
+  const selectClinic = (key: string) => {
+    if (key === clinic) return;
+    setData(null);
+    setLoading(true);
+    setClinic(key);
+  };
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
@@ -305,19 +366,48 @@ export default function ControlesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <ManageDentalinkPatientsDialog onChanged={handleRosterChanged} />
+          <ManageDentalinkPatientsDialog
+            clinic={clinic}
+            clinicName={clinics.find((c) => c.key === clinic)?.nombre}
+            onChanged={handleRosterChanged}
+          />
           <Button
             variant="outline"
             size="sm"
             className="rounded-lg gap-2"
-            onClick={() => load(true)}
-            disabled={refreshing}
+            onClick={handleRefresh}
+            disabled={refreshing || !clinic}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
             Actualizar
           </Button>
         </div>
       </div>
+
+      {/* Clinic tabs */}
+      {clinics.length > 1 && (
+        <div className="flex items-center gap-1 border-b border-gray-100">
+          {clinics.map((c) => {
+            const active = c.key === clinic;
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => selectClinic(c.key)}
+                disabled={!c.available}
+                title={c.available ? undefined : "Falta configurar el token de esta clínica"}
+                className={`relative px-4 py-2.5 text-sm font-bold transition-colors -mb-px border-b-2 ${
+                  active
+                    ? "border-[#6469FC] text-[#6469FC]"
+                    : "border-transparent text-gray-400 hover:text-gray-600"
+                } ${!c.available ? "opacity-40 cursor-not-allowed" : ""}`}
+              >
+                {c.nombre}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Stats strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -400,7 +490,7 @@ export default function ControlesPage() {
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
             {data.pacientes.map((p) => (
-              <ControlRow key={p.id} p={p} />
+              <ControlRow key={p.id} p={p} clinic={clinic} />
             ))}
           </div>
           {totalPages > 1 && (

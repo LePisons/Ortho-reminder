@@ -22,6 +22,7 @@ export interface Patient {
   clinic?: string;
   doctor?: string;
   dentalinkId?: number | null;
+  dentalinkClinic?: string | null;
   createdAt: string;
   updatedAt: string;
   clinicalRecords?: ClinicalRecord[];

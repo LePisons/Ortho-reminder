@@ -17,6 +17,12 @@ import { LinkDentalinkPatientDto } from './dto/link-dentalink-patient.dto';
 export class DentalinkController {
   constructor(private readonly dentalink: DentalinkService) {}
 
+  /** Clinics available as tabs on the Controles page. */
+  @Get('clinics')
+  listClinics() {
+    return this.dentalink.listClinics();
+  }
+
   /**
    * Paginated, searchable list of patient controls. Stats are computed over the
    * full set (not just the current page) so the header strip stays accurate.
@@ -28,8 +34,9 @@ export class DentalinkController {
     @Query('pageSize') pageSize = '20',
     @Query('refresh') refresh?: string,
     @Query('filter') filter?: string,
+    @Query('clinic') clinic?: string,
   ) {
-    const data = await this.dentalink.getControles(refresh === 'true');
+    const data = await this.dentalink.getControles(clinic, refresh === 'true');
 
     const term = (search ?? '').trim().toLowerCase();
     let filtered = term
@@ -63,34 +70,43 @@ export class DentalinkController {
     };
   }
 
-  /** Current editable roster of Dentalink patients. */
+  /** Current editable roster of Dentalink patients for one clinic. */
   @Get('patients')
-  listPatients() {
-    return this.dentalink.listPatients();
+  listPatients(@Query('clinic') clinic?: string) {
+    return this.dentalink.listPatients(clinic);
   }
 
   /** Add a patient to the roster (name auto-resolved from Dentalink if omitted). */
   @Post('patients')
   addPatient(@Body() dto: AddDentalinkPatientDto) {
-    return this.dentalink.addPatient(dto.id, dto.nombre);
+    return this.dentalink.addPatient(dto.id, dto.clinic, dto.nombre);
   }
 
   /** Remove a patient from the roster. */
   @Delete('patients/:id')
-  async removePatient(@Param('id', ParseIntPipe) id: number) {
-    await this.dentalink.removePatient(id);
+  async removePatient(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('clinic') clinic?: string,
+  ) {
+    await this.dentalink.removePatient(id, clinic);
     return { ok: true };
   }
 
   @Get('patients/:id/history')
-  getPatientHistory(@Param('id', ParseIntPipe) id: number) {
-    return this.dentalink.getPatientHistory(id);
+  getPatientHistory(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('clinic') clinic?: string,
+  ) {
+    return this.dentalink.getPatientHistory(id, clinic);
   }
 
   /** Live control summary for one patient (used on the patient profile page). */
   @Get('patients/:id/summary')
-  getPatientSummary(@Param('id', ParseIntPipe) id: number) {
-    return this.dentalink.getPatientSummary(id);
+  getPatientSummary(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('clinic') clinic?: string,
+  ) {
+    return this.dentalink.getPatientSummary(id, clinic);
   }
 
   /** Link an internal patient to a Dentalink ID (also adds to the roster). */
@@ -100,6 +116,7 @@ export class DentalinkController {
       dto.patientId,
       dto.dentalinkId,
       req.user.userId,
+      dto.clinic,
     );
   }
 

@@ -16,11 +16,17 @@ import {
 import { DentalinkApi, type RosterPatient } from "@/lib/api/dentalink.api";
 
 interface ManageDentalinkPatientsDialogProps {
+  /** Clinic the roster belongs to; all reads/writes are scoped to it. */
+  clinic: string;
+  /** Display name of the active clinic, shown in the dialog header. */
+  clinicName?: string;
   /** Called after the roster changes so the parent can refresh the controles list. */
   onChanged: () => void;
 }
 
 export function ManageDentalinkPatientsDialog({
+  clinic,
+  clinicName,
   onChanged,
 }: ManageDentalinkPatientsDialogProps) {
   const [open, setOpen] = useState(false);
@@ -33,11 +39,11 @@ export function ManageDentalinkPatientsDialog({
 
   const loadRoster = useCallback(() => {
     setLoading(true);
-    DentalinkApi.listPatients()
+    DentalinkApi.listPatients(clinic)
       .then(setRoster)
       .catch(() => toast.error("No se pudo cargar la lista de pacientes"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [clinic]);
 
   useEffect(() => {
     if (open) loadRoster();
@@ -57,6 +63,7 @@ export function ManageDentalinkPatientsDialog({
       const added = await DentalinkApi.addPatient({
         id: parsedId,
         nombre: nombre.trim() || undefined,
+        clinic,
       });
       toast.success("Paciente agregado", { description: added.nombre });
       setId("");
@@ -87,7 +94,7 @@ export function ManageDentalinkPatientsDialog({
       return;
     setRemovingId(patient.id);
     try {
-      await DentalinkApi.removePatient(patient.id);
+      await DentalinkApi.removePatient(patient.id, clinic);
       toast.success("Paciente eliminado");
       // Remove from the roster in place instead of refetching the whole list.
       setRoster((prev) => prev.filter((p) => p.id !== patient.id));
@@ -113,7 +120,9 @@ export function ManageDentalinkPatientsDialog({
 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-[#1B1B1B]">Pacientes de Dentalink</DialogTitle>
+          <DialogTitle className="text-[#1B1B1B]">
+            Pacientes de Dentalink{clinicName ? ` · ${clinicName}` : ""}
+          </DialogTitle>
           <DialogDescription>
             Agrega pacientes por su <span className="font-semibold">ID de Dentalink</span>.
             El nombre se completa automáticamente desde Dentalink.
