@@ -100,6 +100,20 @@ export class DentalinkService implements OnModuleInit {
   private readonly ttlMs = 60 * 60 * 1000; // 1h
   private inFlight: Promise<ControlesData> | null = null;
 
+  // Per-patient caches shared by the Controles report AND the patient profile
+  // page, so neither view re-hits Dentalink when the other already fetched the
+  // same data. Concurrent requests for one patient are coalesced.
+  private summaryCache = new Map<number, { data: ControlSummary; expiresAt: number }>();
+  private summaryInFlight = new Map<number, Promise<ControlSummary>>();
+  private citasCache = new Map<number, { data: DentalinkCita[]; expiresAt: number }>();
+
+  // Every Dentalink call funnels through one serialized, spaced-out queue so the
+  // N+1 roster fetch never bursts past Dentalink's (undocumented) request limit
+  // and triggers HTTP 429. 429/5xx responses are retried with backoff below.
+  private requestChain: Promise<unknown> = Promise.resolve();
+  private lastRequestAt = 0;
+  private minRequestIntervalMs = 300;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -107,6 +121,14 @@ export class DentalinkService implements OnModuleInit {
 
   async onModuleInit() {
     this.token = this.configService.get<string>('DENTALINK_TOKEN');
+    // Minimum spacing between Dentalink requests (ms). Tunable per environment
+    // in case the limit ever needs to be approached more or less aggressively.
+    const interval = Number(
+      this.configService.get<string>('DENTALINK_MIN_REQUEST_MS'),
+    );
+    if (Number.isFinite(interval) && interval >= 0) {
+      this.minRequestIntervalMs = interval;
+    }
 
     // Seed the editable roster once from the env var so the existing list of
     // patients persists and becomes manageable from the UI. After that the DB
@@ -171,18 +193,116 @@ export class DentalinkService implements OnModuleInit {
     return { Authorization: `Token ${this.token}` };
   }
 
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Serialized, rate-limited fetch against Dentalink. Requests run one at a time
+   * with a minimum spacing between them, and 429/5xx responses are retried with
+   * exponential backoff (honoring the Retry-After header). This is the single
+   * choke point that keeps the N+1 roster fetch from bursting past Dentalink's
+   * request limit. Every Dentalink HTTP call must go through here.
+   */
+  private dentalinkFetch(url: string): Promise<Response> {
+    const run = async (): Promise<Response> => {
+      const maxRetries = 4;
+      for (let attempt = 0; ; attempt++) {
+        const since = Date.now() - this.lastRequestAt;
+        if (since < this.minRequestIntervalMs) {
+          await this.sleep(this.minRequestIntervalMs - since);
+        }
+        this.lastRequestAt = Date.now();
+
+        let res: Response;
+        try {
+          res = await fetch(url, { headers: this.headers });
+        } catch (e) {
+          if (attempt >= maxRetries) throw e;
+          await this.sleep(1000 * 2 ** attempt);
+          continue;
+        }
+
+        // Success (or a client error worth surfacing) — return as-is.
+        if (res.status !== 429 && res.status < 500) return res;
+        if (attempt >= maxRetries) return res;
+
+        const retryAfter = Number(res.headers.get('retry-after'));
+        const backoff =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? retryAfter * 1000
+            : 1000 * 2 ** attempt;
+        this.logger.warn(
+          `Dentalink HTTP ${res.status} on ${url} — retrying in ${backoff}ms ` +
+            `(attempt ${attempt + 1}/${maxRetries}).`,
+        );
+        await this.sleep(backoff);
+      }
+    };
+
+    // Chain onto the queue so only one Dentalink request is ever in flight.
+    const result = this.requestChain.then(run, run);
+    this.requestChain = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   /** Fetch every page of a Dentalink list endpoint (follows links.next). */
   private async getAll<T = DentalinkCita>(url: string): Promise<T[]> {
     const items: T[] = [];
     let next: string | null = url;
     while (next) {
-      const r = await fetch(next, { headers: this.headers });
+      const r = await this.dentalinkFetch(next);
       if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
       const data = await r.json();
       items.push(...((data.data as T[]) ?? []));
       next = (data.links?.next as string | undefined) ?? null;
     }
     return items;
+  }
+
+  /**
+   * A patient's appointments, cached so the Controles report, the per-patient
+   * summary and the history expansion all share a single Dentalink fetch.
+   */
+  private async getCitas(id: number, force = false): Promise<DentalinkCita[]> {
+    const hit = this.citasCache.get(id);
+    if (!force && hit && Date.now() < hit.expiresAt) return hit.data;
+    const citas = await this.getAll(`${BASE}/pacientes/${id}/citas`);
+    this.citasCache.set(id, { data: citas, expiresAt: Date.now() + this.ttlMs });
+    return citas;
+  }
+
+  /**
+   * Build (or reuse) a patient's control summary. Results are cached per patient
+   * and shared between the Controles report and the patient profile page, and
+   * concurrent requests for the same patient are coalesced into one fetch.
+   */
+  private async getSummaryCached(
+    id: number,
+    nombre: string,
+    force = false,
+  ): Promise<ControlSummary> {
+    const hit = this.summaryCache.get(id);
+    if (!force && hit && Date.now() < hit.expiresAt) return hit.data;
+
+    const existing = this.summaryInFlight.get(id);
+    if (existing) return existing;
+
+    const p = this.buildSummary(id, nombre, force)
+      .then((data) => {
+        this.summaryCache.set(id, {
+          data,
+          expiresAt: Date.now() + this.ttlMs,
+        });
+        return data;
+      })
+      .finally(() => this.summaryInFlight.delete(id));
+
+    this.summaryInFlight.set(id, p);
+    return p;
   }
 
   /** Cached entry point used by the controller. */
@@ -193,7 +313,7 @@ export class DentalinkService implements OnModuleInit {
     // Coalesce concurrent refreshes into a single Dentalink fetch.
     if (this.inFlight) return this.inFlight;
 
-    this.inFlight = this.fetchControles()
+    this.inFlight = this.fetchControles(force)
       .then((data) => {
         this.cache = data;
         this.cacheExpiresAt = Date.now() + this.ttlMs;
@@ -206,7 +326,7 @@ export class DentalinkService implements OnModuleInit {
     return this.inFlight;
   }
 
-  private async fetchControles(): Promise<ControlesData> {
+  private async fetchControles(force = false): Promise<ControlesData> {
     const today = todayMidnight();
     const result: ControlesData = {
       fechaReporte: ymd(today),
@@ -219,7 +339,7 @@ export class DentalinkService implements OnModuleInit {
 
     for (const { id, nombre } of this.patients) {
       try {
-        result.pacientes.push(await this.buildSummary(id, nombre));
+        result.pacientes.push(await this.getSummaryCached(id, nombre, force));
       } catch (e) {
         result.errores.push({
           id,
@@ -248,9 +368,10 @@ export class DentalinkService implements OnModuleInit {
   private async buildSummary(
     id: number,
     nombre: string,
+    force = false,
   ): Promise<ControlSummary> {
     const today = todayMidnight();
-    const citas = await this.getAll(`${BASE}/pacientes/${id}/citas`);
+    const citas = await this.getCitas(id, force);
     let proximo: DentalinkCita | null = null;
     const atendidas: DentalinkCita[] = [];
 
@@ -328,7 +449,7 @@ export class DentalinkService implements OnModuleInit {
    * Live control summary for a single patient (not roster-cached). Used by the
    * patient profile page to show the last two clinical histories.
    */
-  async getPatientSummary(id: number): Promise<ControlSummary> {
+  async getPatientSummary(id: number, force = false): Promise<ControlSummary> {
     if (!this.token) {
       throw new BadRequestException(
         'La integración con Dentalink no está configurada (falta DENTALINK_TOKEN).',
@@ -336,7 +457,9 @@ export class DentalinkService implements OnModuleInit {
     }
     const known = this.patients.find((p) => p.id === id);
     const nombre = known?.nombre ?? (await this.fetchPatientName(id));
-    return this.buildSummary(id, nombre);
+    // Shared per-patient cache: when the Controles report already fetched this
+    // patient (or vice versa), this returns instantly without hitting Dentalink.
+    return this.getSummaryCached(id, nombre, force);
   }
 
   /**
@@ -368,8 +491,10 @@ export class DentalinkService implements OnModuleInit {
   }> {
     if (!this.token) throw new Error('Dentalink integration is not configured');
     const known = this.patients.find((p) => p.id === id);
-    const citas = await this.getAll(`${BASE}/pacientes/${id}/citas`);
-    citas.sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? ''));
+    // Reuse the cached appointments (sort a copy so the cache stays untouched).
+    const citas = [...(await this.getCitas(id))].sort((a, b) =>
+      (b.fecha ?? '').localeCompare(a.fecha ?? ''),
+    );
     return { id, nombre: known?.nombre ?? `Paciente ${id}`, citas };
   }
 
@@ -398,7 +523,8 @@ export class DentalinkService implements OnModuleInit {
       update: { nombre: resolved },
     });
     this.patients = await this.loadPatients();
-    this.invalidateCache(); // surface the new patient on the next load
+    this.forgetPatient(id); // re-resolve this patient's data on the next load
+    this.invalidateReport(); // surface the new patient on the next report load
     return { id: saved.id, nombre: saved.nombre };
   }
 
@@ -406,7 +532,8 @@ export class DentalinkService implements OnModuleInit {
   async removePatient(id: number): Promise<void> {
     await this.prisma.dentalinkPatient.deleteMany({ where: { id } });
     this.patients = await this.loadPatients();
-    this.invalidateCache();
+    this.forgetPatient(id);
+    this.invalidateReport();
   }
 
   /**
@@ -425,7 +552,8 @@ export class DentalinkService implements OnModuleInit {
       where: { id: patientId },
       data: { dentalinkId },
     });
-    return this.buildSummary(dentalinkId, nombre);
+    // Fetch once and warm the shared cache so the patient page is instant.
+    return this.getSummaryCached(dentalinkId, nombre, true);
   }
 
   /** Unlink an internal patient from Dentalink (roster entry is left intact). */
@@ -451,14 +579,21 @@ export class DentalinkService implements OnModuleInit {
     return patient;
   }
 
-  private invalidateCache() {
+  /** Invalidate the assembled report (per-patient caches are left intact). */
+  private invalidateReport() {
     this.cache = null;
     this.cacheExpiresAt = 0;
   }
 
+  /** Drop one patient's cached summary/appointments so they refetch next time. */
+  private forgetPatient(id: number) {
+    this.summaryCache.delete(id);
+    this.citasCache.delete(id);
+  }
+
   /** Resolve a patient's display name from Dentalink by ID. */
   private async fetchPatientName(id: number): Promise<string> {
-    const r = await fetch(`${BASE}/pacientes/${id}`, { headers: this.headers });
+    const r = await this.dentalinkFetch(`${BASE}/pacientes/${id}`);
     if (r.status === 404) {
       throw new NotFoundException(`No existe el paciente ${id} en Dentalink.`);
     }
