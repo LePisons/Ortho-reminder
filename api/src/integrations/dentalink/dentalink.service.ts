@@ -741,6 +741,57 @@ export class DentalinkService implements OnModuleInit {
     return nombre || `Paciente ${id}`;
   }
 
+  /**
+   * Full demographics for a Dentalink patient, used to prefill a new internal
+   * patient (see the MCP "create from Dentalink" flow). Pulls from the same
+   * /pacientes/{id} payload as fetchPatientName but keeps rut/email/phone.
+   */
+  async getPatientProfile(
+    id: number,
+    clinicKey?: string,
+  ): Promise<{
+    id: number;
+    nombre: string;
+    rut: string | null;
+    email: string | null;
+    telefono: string | null;
+  }> {
+    const state = this.clinic(clinicKey);
+    if (!state.token) {
+      throw new BadRequestException(
+        `La integración con Dentalink no está configurada para ${state.nombre}.`,
+      );
+    }
+    const r = await this.dentalinkFetch(state, `${BASE}/pacientes/${id}`);
+    if (r.status === 404) {
+      throw new NotFoundException(
+        `No existe el paciente ${id} en Dentalink (${state.nombre}).`,
+      );
+    }
+    if (!r.ok) {
+      throw new BadRequestException(
+        `Error consultando Dentalink (HTTP ${r.status}).`,
+      );
+    }
+    const json = await r.json();
+    const d = (json.data ?? json) as {
+      nombre?: string;
+      apellidos?: string;
+      rut?: string;
+      email?: string;
+      telefono?: string;
+      celular?: string;
+    };
+    const nombre = [d.nombre, d.apellidos].filter(Boolean).join(' ').trim();
+    return {
+      id,
+      nombre: nombre || `Paciente ${id}`,
+      rut: d.rut?.trim() || null,
+      email: d.email?.trim() || null,
+      telefono: d.telefono?.trim() || d.celular?.trim() || null,
+    };
+  }
+
   // Warm/refresh every clinic's cache once a day so the first page load of the
   // morning is already fast (mirrors the weekly-report cadence).
   @Cron(CronExpression.EVERY_DAY_AT_6AM)

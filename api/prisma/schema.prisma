@@ -180,6 +180,25 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   patients  Patient[]
+  apiKeys   ApiKey[]
+}
+
+/// Long-lived, revocable API keys for headless/agent access (e.g. the MCP
+/// server). The raw key is shown once at creation; only its bcrypt hash is
+/// stored. `prefix` is the human-readable leading segment used for lookup and
+/// display. See api-key.guard.ts for verification.
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  prefix     String    @unique
+  hashedKey  String
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
 }
 
 enum BatchStatus {

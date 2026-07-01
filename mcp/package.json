@@ -1,0 +1,24 @@
+{
+  "name": "ortho-mcp",
+  "version": "0.1.0",
+  "description": "MCP server exposing OrthoReminder patient + Dentalink tools to agents",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ortho-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

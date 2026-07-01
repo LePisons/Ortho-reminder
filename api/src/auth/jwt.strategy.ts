@@ -10,6 +10,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         (request: any) => {
           return request?.cookies?.access_token;
         },
+        // Also accept `Authorization: Bearer <jwt>` for headless clients (CLI,
+        // scripts). API keys use a separate guard; see api-key.guard.ts.
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
       secretOrKey: process.env.JWT_SECRET as string,

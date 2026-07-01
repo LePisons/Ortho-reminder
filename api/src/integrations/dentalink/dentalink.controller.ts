@@ -100,6 +100,15 @@ export class DentalinkController {
     return this.dentalink.getPatientHistory(id, clinic);
   }
 
+  /** Demographics for one Dentalink patient (rut/name/email/phone). */
+  @Get('patients/:id/profile')
+  getPatientProfile(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('clinic') clinic?: string,
+  ) {
+    return this.dentalink.getPatientProfile(id, clinic);
+  }
+
   /** Live control summary for one patient (used on the patient profile page). */
   @Get('patients/:id/summary')
   getPatientSummary(

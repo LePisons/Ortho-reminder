@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { CombinedAuthGuard } from './auth/combined-auth.guard';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReminderService } from './reminder/reminder.service';
@@ -57,15 +58,17 @@ import { HealthController } from './health/health.controller';
     OnboardingModule,
     SettingsModule,
     MessageTemplatesModule,
+    ApiKeysModule,
   ],
   controllers: [HealthController],
   providers: [
     ReminderService,
     TwilioService,
-    // Authenticate every route by default; opt out with @Public()
+    // Authenticate every route by default; opt out with @Public().
+    // Accepts cookie/Bearer JWTs and `ork_` API keys (see CombinedAuthGuard).
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard,
+      useClass: CombinedAuthGuard,
     },
     // Rate-limit every route; tighten specific routes with @Throttle()
     {
