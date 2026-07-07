@@ -146,6 +146,24 @@ railway run --service api pnpm prisma db seed
 > use case) still work fine. If you later need inbound webhooks, expose just that route via a
 > dedicated public path with an Access *bypass* policy + the existing `WHATSAPP_VERIFY_TOKEN`.
 
+## Giving the lab technician access (LAB_TECH role)
+
+The lab technician gets a restricted account that can only see the **Lab** board
+(`/lab`): active production orders, stage/models-printed updates, notes, and print-file
+downloads. The API enforces this server-side (`LabTechGuard` whitelists only `@LabAccess()`
+routes for the LAB_TECH role), so this is safe even if the UI is bypassed.
+
+1. **Cloudflare Access:** Zero Trust → Access → Applications → your `app.*` application →
+   the Allow policy → add the technician's email to the *Emails* rule (keep One-time PIN as
+   the login method; no extra cost). They'll verify with a PIN sent to that email.
+2. **Provision the account** (from a machine with prod `DATABASE_URL`, or Railway shell):
+   ```bash
+   cd api && pnpm create-user --email tech@example.com --name "Nombre Técnico" --role LAB_TECH
+   ```
+   The password prints once — share it over a secure channel.
+3. The technician logs in at `app.yourdomain.com` and lands directly on the Lab board.
+   Every other page and API route is blocked for that account.
+
 ## Step 6 — Auto-deploy
 
 Railway's GitHub integration redeploys on every push to `main` by default. In each service's

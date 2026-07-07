@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CombinedAuthGuard } from './auth/combined-auth.guard';
+import { LabTechGuard } from './auth/lab-tech.guard';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -20,6 +21,7 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { TodoistModule } from './integrations/todoist/todoist.module';
 import { DentalinkModule } from './integrations/dentalink/dentalink.module';
 import { AlignerBatchesModule } from './aligner-batches/aligner-batches.module';
+import { LabModule } from './lab/lab.module';
 import { ReevaluationsModule } from './reevaluations/reevaluations.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
@@ -53,6 +55,7 @@ import { HealthController } from './health/health.controller';
     TodoistModule,
     DentalinkModule,
     AlignerBatchesModule,
+    LabModule,
     ReevaluationsModule,
     MessagingModule,
     OnboardingModule,
@@ -69,6 +72,12 @@ import { HealthController } from './health/health.controller';
     {
       provide: APP_GUARD,
       useClass: CombinedAuthGuard,
+    },
+    // LAB_TECH is whitelist-only: after auth, block any route not marked
+    // @LabAccess() (or @Public()) for lab technician accounts.
+    {
+      provide: APP_GUARD,
+      useClass: LabTechGuard,
     },
     // Rate-limit every route; tighten specific routes with @Throttle()
     {

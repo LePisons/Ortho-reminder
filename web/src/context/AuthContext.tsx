@@ -8,7 +8,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
-  role?: 'ADMIN' | 'STAFF';
+  role?: 'ADMIN' | 'STAFF' | 'LAB_TECH';
   createdAt?: string;
 }
 
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [router]);
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (): Promise<User | null> => {
     try {
       const res = await fetch(`${API_URL}/auth/profile`, {
         credentials: 'include',
@@ -74,11 +74,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(userData);
         // A fresh valid session re-arms the 401 redirect for the next expiry.
         redirectingRef.current = false;
-      } else {
-        setUser(null);
+        return userData;
       }
+      setUser(null);
+      return null;
     } catch {
       setUser(null);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -89,8 +91,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [checkAuth]);
 
   const login = async () => {
-    await checkAuth();
-    router.push('/');
+    const loggedIn = await checkAuth();
+    // Lab technicians only have access to the lab board.
+    router.push(loggedIn?.role === 'LAB_TECH' ? '/lab' : '/');
   };
 
   const logout = async () => {

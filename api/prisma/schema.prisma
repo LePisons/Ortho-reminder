@@ -169,6 +169,7 @@ model Appointment {
 enum Role {
   ADMIN
   STAFF
+  LAB_TECH
 }
 
 model User {
@@ -210,6 +211,18 @@ enum BatchStatus {
   CANCELLED
 }
 
+/// Lab-internal progress within an IN_PRODUCTION batch, updated by the lab
+/// technician from the Lab tab. Independent of BatchStatus: COMPLETED means
+/// "ready to ship"; the clinic still confirms DELIVERED_TO_CLINIC.
+enum ProductionStage {
+  RECEIVED
+  PRINTING_MODELS
+  THERMOFORMING
+  TRIMMING_POLISHING
+  PACKAGING
+  COMPLETED
+}
+
 model AlignerBatch {
   id                   String      @id @default(cuid())
   status               BatchStatus @default(NEEDED)
@@ -222,6 +235,8 @@ model AlignerBatch {
   gooFileUrl           String?
   technicianEmail      String?
   technicianNotes      String?
+  productionStage      ProductionStage? // null until the lab picks the order up
+  modelsPrinted        Int         @default(0) // 3D-printed models done so far, out of alignerCount
   createdBy            String?
 
   patientId String

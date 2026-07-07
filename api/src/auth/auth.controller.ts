@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { Public } from './public.decorator';
+import { LabAccess } from './lab-access.decorator';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 
@@ -39,6 +40,7 @@ export class AuthController {
   // Public self-registration is disabled. Accounts are provisioned via the seed
   // script (see prisma/seed.ts) or an authenticated admin flow.
 
+  @LabAccess()
   @Get('profile')
   async getProfile(@Request() req) {
     const user = await this.usersService.findOne(req.user.userId);
@@ -47,6 +49,7 @@ export class AuthController {
     return result;
   }
 
+  @LabAccess()
   @Patch('profile')
   async updateProfile(@Request() req, @Body() body: { name?: string; email?: string; currentPassword?: string; newPassword?: string }) {
     const updateData: any = {};

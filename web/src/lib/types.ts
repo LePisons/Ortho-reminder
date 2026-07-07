@@ -107,6 +107,14 @@ export interface BatchEvent {
   createdAt: string;
 }
 
+export type ProductionStage =
+  | 'RECEIVED'
+  | 'PRINTING_MODELS'
+  | 'THERMOFORMING'
+  | 'TRIMMING_POLISHING'
+  | 'PACKAGING'
+  | 'COMPLETED';
+
 export interface AlignerBatch {
   id: string;
   status: BatchStatus;
@@ -119,11 +127,20 @@ export interface AlignerBatch {
   gooFileUrl?: string | null;
   technicianEmail?: string;
   technicianNotes?: string;
+  productionStage?: ProductionStage | null;
+  modelsPrinted?: number;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
   patientId: string;
   batchEvents?: BatchEvent[];
+}
+
+// Shape returned by GET /lab/orders (gooFileUrl is replaced by hasFiles).
+export interface LabOrder extends Omit<AlignerBatch, 'gooFileUrl'> {
+  orderNumber: string;
+  hasFiles: boolean;
+  patient: { id: string; fullName: string };
 }
 
 export type ReevaluationStatus = 'NEEDED' | 'SCAN_UPLOADED' | 'APPROVED';

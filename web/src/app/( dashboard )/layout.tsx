@@ -1,20 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, PanelLeftClose, PanelLeftOpen, Stethoscope } from "lucide-react";
+import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, PanelLeftClose, PanelLeftOpen, Stethoscope, Factory } from "lucide-react";
 import { PatientSearch } from "@/components/features/patients/patient-search";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { href: "/pipeline", label: "Pipeline", icon: <ClipboardList className="w-5 h-5" /> },
+  { href: "/lab", label: "Lab", icon: <Factory className="w-5 h-5" /> },
   { href: "/calendar", label: "Calendar", icon: <CalendarDays className="w-5 h-5" /> },
   { href: "/controles", label: "Controles", icon: <Stethoscope className="w-5 h-5" /> },
   { href: "/history", label: "Message History", icon: <MessageSquare className="w-5 h-5" /> },
   { href: "/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
+];
+
+// Lab technicians only ever see (and can only reach) the lab board; the API
+// enforces the same whitelist server-side via LabTechGuard.
+const labTechNavItems = [
+  { href: "/lab", label: "Laboratorio", icon: <Factory className="w-5 h-5" /> },
 ];
 
 function UserMenu({ collapsed }: { collapsed: boolean }) {
@@ -74,6 +81,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
       {open && (
         <div className={`absolute top-full ${collapsed ? "left-full ml-2" : "left-0 right-0"} mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 min-w-[200px]`}>
           <div className="p-1.5">
+            {user?.role !== "LAB_TECH" && (<>
             <Link
               href="/settings"
               onClick={() => setOpen(false)}
@@ -86,6 +94,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
               Account Settings
             </Link>
             <div className="my-1 border-t border-gray-100" />
+            </>)}
             <button
               onClick={() => {
                 setOpen(false);
@@ -111,13 +120,23 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const isLabTech = user?.role === "LAB_TECH";
+  const items = isLabTech ? labTechNavItems : navItems;
 
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
     if (saved === "true") setCollapsed(true);
   }, []);
+
+  // Keep lab technicians on the lab board no matter what URL they open.
+  useEffect(() => {
+    if (!isLoading && isLabTech && !pathname.startsWith("/lab")) {
+      router.replace("/lab");
+    }
+  }, [isLoading, isLabTech, pathname, router]);
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -201,8 +220,8 @@ export default function DashboardLayout({
           </div>
         )}
 
-        {/* Patient Search */}
-        {isAuthenticated && (
+        {/* Patient Search (not for lab technicians — patient APIs are off-limits) */}
+        {isAuthenticated && !isLabTech && (
           <div className={`shrink-0 transition-all duration-300 ${collapsed ? "px-2 pb-2" : "px-4 pb-4"}`}>
             <PatientSearch collapsed={collapsed} />
           </div>
@@ -210,7 +229,7 @@ export default function DashboardLayout({
 
         {/* Navigation */}
         <nav className={`flex flex-1 flex-col gap-2 pb-6 transition-all duration-300 ${collapsed ? "px-2" : "px-4"}`}>
-          {navItems.map((item) => {
+          {items.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <Link
