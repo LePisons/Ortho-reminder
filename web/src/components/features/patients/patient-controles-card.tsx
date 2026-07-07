@@ -20,6 +20,7 @@ import {
   type ControlSummary,
   type DentalinkCita,
 } from "@/lib/api/dentalink.api";
+import { DentalinkStore } from "@/lib/dentalink-store";
 import type { Patient } from "@/lib/types";
 
 function fmtCita(c: DentalinkCita | null | undefined): string {
@@ -69,7 +70,9 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
     setLoading(true);
     setError(null);
     try {
-      setSummary(await DentalinkApi.getPatientSummary(id, clinic ?? undefined));
+      // Shared app-wide cache: revisiting a patient (or having warmed the
+      // clinic elsewhere) renders instantly without a Dentalink round-trip.
+      setSummary(await DentalinkStore.getPatientSummary(id, clinic ?? undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar los controles");
     } finally {
@@ -85,7 +88,7 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
   // Load the clinic options lazily, only when the link dialog opens.
   useEffect(() => {
     if (!linkOpen || clinics.length > 0) return;
-    DentalinkApi.listClinics()
+    DentalinkStore.getClinics()
       .then((list) => {
         setClinics(list);
         setClinicInput(
@@ -117,6 +120,9 @@ export function PatientControlesCard({ patient, onPatch }: PatientControlesCardP
         clinic,
       });
       setSummary(linked);
+      // Linking adds the patient to the clinic's controles roster server-side,
+      // so any cached controles list for that clinic is now stale.
+      DentalinkStore.invalidateClinic(clinic);
       onPatch({ dentalinkId: parsedId, dentalinkClinic: clinic ?? null });
       toast.success("Paciente agregado a controles");
       setLinkOpen(false);

@@ -25,7 +25,21 @@ const STAGE_LABELS: Record<ProductionStage, string> = {
 };
 
 // Only patient fields the lab needs; deliberately excludes contact/clinical data.
-const LAB_PATIENT_SELECT = { id: true, fullName: true } as const;
+// dentalinkId/dentalinkClinic let the web bucket orders into clinic sub-tabs.
+const LAB_PATIENT_SELECT = {
+  id: true,
+  fullName: true,
+  dentalinkId: true,
+  dentalinkClinic: true,
+} as const;
+
+// Batch statuses that count as "active" on a patient row (pre-handoff).
+const OPEN_BATCH_STATUSES: BatchStatus[] = [
+  BatchStatus.NEEDED,
+  BatchStatus.ORDER_SENT,
+  BatchStatus.IN_PRODUCTION,
+  BatchStatus.DELIVERED_TO_CLINIC,
+];
 
 @Injectable()
 export class LabService {
@@ -97,6 +111,38 @@ export class LabService {
       active: active.map((b) => this.toOrderView(b)),
       recentlyCompleted: recent.map((b) => this.toOrderView(b)),
     };
+  }
+
+  /**
+   * Practice-wide patient roster for the Lab board (all clinics; the web
+   * groups by dentalinkClinic). Minimal projection: names, aligner progress
+   * and the open batch — no contact or clinical data.
+   */
+  async listPatients() {
+    return this.prisma.patient.findMany({
+      where: { deletedAt: null },
+      select: {
+        ...LAB_PATIENT_SELECT,
+        status: true,
+        currentAligner: true,
+        totalAligners: true,
+        alignerBatches: {
+          where: { status: { in: OPEN_BATCH_STATUSES } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            productionStage: true,
+            modelsPrinted: true,
+            batchNumber: true,
+            alignerCount: true,
+            expectedDeliveryDate: true,
+          },
+        },
+      },
+      orderBy: { fullName: 'asc' },
+    });
   }
 
   private async findActiveOrder(id: string) {

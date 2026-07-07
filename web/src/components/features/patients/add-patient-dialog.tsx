@@ -1,6 +1,6 @@
 "use client";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { CloudDownload, Loader2, Plus } from "lucide-react";
 import { API_URL } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,8 @@ import {
 import { useEffect, useState } from "react";
 import { formatRut } from "@/lib/format-rut";
 import { PatientsApi } from "@/lib/api/patients.api";
+import { DentalinkApi, type Clinic } from "@/lib/api/dentalink.api";
+import { DentalinkStore } from "@/lib/dentalink-store";
 
 // defines the props interface
 
@@ -53,12 +55,33 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
     doctors: string[];
   }>({ clinics: [], doctors: [] });
 
+  // Import-from-Dentalink state: after a successful lookup the created patient
+  // is auto-linked to this Dentalink id/clinic.
+  const [dlClinics, setDlClinics] = useState<Clinic[]>([]);
+  const [dlClinic, setDlClinic] = useState("");
+  const [dlId, setDlId] = useState("");
+  const [dlLoading, setDlLoading] = useState(false);
+  const [imported, setImported] = useState<{ dentalinkId: number; clinic?: string } | null>(null);
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Discard any pending import when the dialog closes without saving.
+      setImported(null);
+      setDlId("");
+      return;
+    }
     PatientsApi.getFieldSuggestions()
       .then(setSuggestions)
       .catch(() => {
         /* suggestions are best-effort; ignore failures */
+      });
+    DentalinkStore.getClinics()
+      .then((list) => {
+        setDlClinics(list);
+        setDlClinic((cur) => cur || (list.find((c) => c.available) ?? list[0])?.key || "");
+      })
+      .catch(() => {
+        /* import section simply won't offer a clinic selector */
       });
   }, [isOpen]);
 
@@ -78,6 +101,36 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
       treatmentStartDate: getTodayDateString(), // Defaults to today's date in YYYY-MM-DD format
     },
   });
+
+  const handleImport = async () => {
+    const parsedId = Number(dlId.trim());
+    if (!Number.isInteger(parsedId) || parsedId <= 0) {
+      toast.warning("ID inválido", {
+        description: "Ingresa el ID numérico del paciente en Dentalink.",
+      });
+      return;
+    }
+    setDlLoading(true);
+    try {
+      const profile = await DentalinkApi.getPatientProfile(parsedId, dlClinic || undefined);
+      // Prefill only what Dentalink knows; missing fields stay editable/blank.
+      form.setValue("fullName", profile.nombre ?? "");
+      form.setValue("rut", profile.rut ? formatRut(profile.rut) : "");
+      form.setValue("email", profile.email ?? "");
+      form.setValue("phone", profile.telefono ?? "");
+      setImported({ dentalinkId: parsedId, clinic: dlClinic || undefined });
+      toast.success(`Datos de ${profile.nombre} importados`, {
+        description:
+          "Completa los datos del tratamiento y guarda. Se vinculará a Controles automáticamente.",
+      });
+    } catch (e) {
+      toast.error("No se pudo importar", {
+        description: e instanceof Error ? e.message : "Error desconocido",
+      });
+    } finally {
+      setDlLoading(false);
+    }
+  };
 
   // 2. Define a submit handler.
   async function onSubmit(values: Record<string, unknown>) {
@@ -127,11 +180,32 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
         throw new Error(`API returned ${response.status}: ${errText}`);
       }
 
+      const created = await response.json().catch(() => null);
+
+      // Imported from Dentalink → link the new patient (adds them to the
+      // clinic's Controles roster server-side). Link failure is non-fatal.
+      if (imported && created?.id) {
+        try {
+          await DentalinkApi.linkPatient({
+            patientId: created.id,
+            dentalinkId: imported.dentalinkId,
+            clinic: imported.clinic,
+          });
+          DentalinkStore.invalidateClinic(imported.clinic);
+        } catch (e) {
+          toast.warning("Paciente creado, pero no se pudo vincular a Controles", {
+            description: e instanceof Error ? e.message : "Vincúlalo desde su perfil.",
+          });
+        }
+      }
+
       // This is where we will add the "refresh" logic later
       toast.success("Patient created successfully!");
       onPatientAdded();
       setIsOpen(false);
       form.reset();
+      setImported(null);
+      setDlId("");
     } catch (error) {
       toast.error("Uh oh! Something went wrong.", {
         description: "There was a problem with your request.",
@@ -172,6 +246,55 @@ export function AddPatientDialog({ onPatientAdded }: AddPatientDialogProps) {
             })}
             className="space-y-4"
           >
+            {/* Import from Dentalink: prefill name/RUT/email/phone by ID. */}
+            <div
+              className={`rounded-xl border p-3 space-y-2 ${
+                imported ? "border-emerald-200 bg-emerald-50/40" : "border-gray-200 bg-gray-50/60"
+              }`}
+            >
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <CloudDownload className="w-3.5 h-3.5" />
+                Importar desde Dentalink (opcional)
+              </p>
+              <div className="flex gap-2">
+                {dlClinics.length > 1 && (
+                  <select
+                    value={dlClinic}
+                    onChange={(e) => setDlClinic(e.target.value)}
+                    className="rounded-md border border-gray-200 bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6469FC]/30 focus:border-[#6469FC]"
+                  >
+                    {dlClinics.map((c) => (
+                      <option key={c.key} value={c.key} disabled={!c.available}>
+                        {c.nombre}
+                        {c.available ? "" : " (sin token)"}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Input
+                  value={dlId}
+                  onChange={(e) => setDlId(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="ID de Dentalink (ej: 1416)"
+                  className="bg-white"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleImport}
+                  disabled={dlLoading || !dlId.trim()}
+                  className="shrink-0"
+                >
+                  {dlLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Buscar"}
+                </Button>
+              </div>
+              {imported && (
+                <p className="text-xs text-emerald-700">
+                  Se vinculará a Controles (ID {imported.dentalinkId}) al guardar.
+                </p>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="fullName"

@@ -136,11 +136,36 @@ export interface AlignerBatch {
   batchEvents?: BatchEvent[];
 }
 
+// Minimal patient projection the lab endpoints expose (no contact/clinical data).
+export interface LabOrderPatient {
+  id: string;
+  fullName: string;
+  dentalinkId?: number | null;
+  dentalinkClinic?: string | null;
+}
+
 // Shape returned by GET /lab/orders (gooFileUrl is replaced by hasFiles).
 export interface LabOrder extends Omit<AlignerBatch, 'gooFileUrl'> {
   orderNumber: string;
   hasFiles: boolean;
-  patient: { id: string; fullName: string };
+  patient: LabOrderPatient;
+}
+
+// Shape returned by GET /lab/patients: practice-wide roster for the Lab board.
+export interface LabPatient extends LabOrderPatient {
+  status: 'ACTIVE' | 'PAUSED' | 'FINISHED';
+  currentAligner: number;
+  totalAligners: number;
+  alignerBatches: Pick<
+    AlignerBatch,
+    | 'id'
+    | 'status'
+    | 'productionStage'
+    | 'modelsPrinted'
+    | 'batchNumber'
+    | 'alignerCount'
+    | 'expectedDeliveryDate'
+  >[];
 }
 
 export type ReevaluationStatus = 'NEEDED' | 'SCAN_UPLOADED' | 'APPROVED';

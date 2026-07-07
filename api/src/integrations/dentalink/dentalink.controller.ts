@@ -12,12 +12,15 @@ import {
 import { ControlSummary, DentalinkService } from './dentalink.service';
 import { AddDentalinkPatientDto } from './dto/add-dentalink-patient.dto';
 import { LinkDentalinkPatientDto } from './dto/link-dentalink-patient.dto';
+import { LabAccess } from '../../auth/lab-access.decorator';
 
 @Controller('dentalink')
 export class DentalinkController {
   constructor(private readonly dentalink: DentalinkService) {}
 
   /** Clinics available as tabs on the Controles page. */
+  // @LabAccess: the Lab board's clinic sub-tabs need the clinic list too.
+  @LabAccess()
   @Get('clinics')
   listClinics() {
     return this.dentalink.listClinics();
@@ -27,6 +30,9 @@ export class DentalinkController {
    * Paginated, searchable list of patient controls. Stats are computed over the
    * full set (not just the current page) so the header strip stays accurate.
    */
+  // @LabAccess: read-only controles feed the Lab board's patient roster. All
+  // other /dentalink routes stay blocked for LAB_TECH.
+  @LabAccess()
   @Get('controles')
   async getControles(
     @Query('search') search?: string,

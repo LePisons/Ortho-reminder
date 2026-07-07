@@ -48,6 +48,15 @@ export interface PatientHistory {
   citas: DentalinkCita[];
 }
 
+/** Demographics from Dentalink, used to prefill the Add Patient form. */
+export interface DentalinkProfile {
+  id: number;
+  nombre: string;
+  rut: string | null;
+  email: string | null;
+  telefono: string | null;
+}
+
 /** Append a clinic key to a query string when one is provided. */
 function withClinic(q: URLSearchParams, clinic?: string) {
   if (clinic) q.set("clinic", clinic);
@@ -92,6 +101,25 @@ export const DentalinkApi = {
       `${API_URL}/dentalink/patients/${id}/history?${q.toString()}`,
     );
     if (!res.ok) throw new Error("Failed to fetch patient history");
+    return res.json();
+  },
+
+  getPatientProfile: async (
+    id: number,
+    clinic?: string,
+  ): Promise<DentalinkProfile> => {
+    const q = withClinic(new URLSearchParams(), clinic);
+    const res = await fetch(
+      `${API_URL}/dentalink/patients/${id}/profile?${q.toString()}`,
+      { credentials: "include" },
+    );
+    if (!res.ok) {
+      const msg = await res
+        .json()
+        .then((b) => (Array.isArray(b?.message) ? b.message.join(", ") : b?.message))
+        .catch(() => null);
+      throw new Error(msg || "No se encontró el paciente en Dentalink");
+    }
     return res.json();
   },
 

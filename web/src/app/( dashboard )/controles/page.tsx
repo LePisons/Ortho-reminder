@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -27,6 +27,7 @@ import {
   type DentalinkCita,
   type PatientHistory,
 } from "@/lib/api/dentalink.api";
+import { DentalinkStore } from "@/lib/dentalink-store";
 
 const PAGE_SIZE = 20;
 
@@ -239,15 +240,14 @@ export default function ControlesPage() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<ControlesFilter | null>(null);
 
-  // Per-(clinic + query) response cache. Switching between tabs that were
-  // already loaded with the same search/filter/page is instant and makes no
-  // network request at all; the backend itself also caches Dentalink calls.
-  const responseCache = useRef<Map<string, ControlesResponse>>(new Map());
-  const cacheKey = `${clinic}|${debounced}|${filter ?? ""}|${page}`;
+  // Responses are cached app-wide in DentalinkStore (keyed per
+  // clinic+search+filter+page), so revisiting this page — or any other page
+  // that already loaded a clinic's controles, like the Lab board — is instant
+  // and makes no network request; the backend also caches Dentalink calls.
 
   // Load the clinic tabs once and default to the first available one.
   useEffect(() => {
-    DentalinkApi.listClinics()
+    DentalinkStore.getClinics()
       .then((list) => {
         setClinics(list);
         setClinic((cur) => cur || (list.find((c) => c.available) ?? list[0])?.key || "");
@@ -274,9 +274,17 @@ export default function ControlesPage() {
   const load = useCallback(
     async (refresh = false) => {
       if (!clinic) return;
-      // Serve an unchanged tab from the page cache — no request needed.
+      const params = {
+        search: debounced,
+        page,
+        pageSize: PAGE_SIZE,
+        filter: filter ?? undefined,
+        clinic,
+      };
+      // Serve an unchanged tab straight from the shared cache — no request,
+      // no spinner flash.
       if (!refresh) {
-        const cached = responseCache.current.get(cacheKey);
+        const cached = DentalinkStore.peekControles(params);
         if (cached) {
           setData(cached);
           setLoading(false);
@@ -285,15 +293,7 @@ export default function ControlesPage() {
       }
       try {
         if (refresh) setRefreshing(true);
-        const res = await DentalinkApi.getControles({
-          search: debounced,
-          page,
-          pageSize: PAGE_SIZE,
-          refresh,
-          filter: filter ?? undefined,
-          clinic,
-        });
-        responseCache.current.set(cacheKey, res);
+        const res = await DentalinkStore.getControles(params, { refresh });
         setData(res);
       } catch (e) {
         console.error("Failed to fetch controles:", e);
@@ -302,7 +302,7 @@ export default function ControlesPage() {
         setRefreshing(false);
       }
     },
-    [debounced, page, filter, clinic, cacheKey],
+    [debounced, page, filter, clinic],
   );
 
   useEffect(() => {
@@ -315,9 +315,7 @@ export default function ControlesPage() {
   // indicator — the list stays visible the whole time.
   const handleRosterChanged = useCallback(async () => {
     setSyncing(true);
-    for (const key of [...responseCache.current.keys()]) {
-      if (key.startsWith(`${clinic}|`)) responseCache.current.delete(key);
-    }
+    DentalinkStore.invalidateClinic(clinic);
     try {
       await load(false);
     } finally {
@@ -325,11 +323,9 @@ export default function ControlesPage() {
     }
   }, [load, clinic]);
 
-  // A manual refresh must bypass the page cache for the active clinic too.
+  // A manual refresh must bypass the shared cache for the active clinic too.
   const handleRefresh = useCallback(() => {
-    for (const key of [...responseCache.current.keys()]) {
-      if (key.startsWith(`${clinic}|`)) responseCache.current.delete(key);
-    }
+    DentalinkStore.invalidateClinic(clinic);
     load(true);
   }, [load, clinic]);
 

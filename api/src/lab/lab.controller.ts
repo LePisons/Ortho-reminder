@@ -25,6 +25,11 @@ export class LabController {
     return this.labService.listOrders();
   }
 
+  @Get('patients')
+  listPatients() {
+    return this.labService.listPatients();
+  }
+
   @Patch('orders/:id/production')
   updateProduction(
     @Param('id') id: string,
