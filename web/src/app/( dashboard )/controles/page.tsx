@@ -343,7 +343,7 @@ export default function ControlesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B]">
             Controles
@@ -382,7 +382,7 @@ export default function ControlesPage() {
 
       {/* Clinic tabs */}
       {clinics.length > 1 && (
-        <div className="flex items-center gap-1 border-b border-gray-100">
+        <div className="flex items-center gap-1 border-b border-gray-100 overflow-x-auto">
           {clinics.map((c) => {
             const active = c.key === clinic;
             return (
@@ -392,7 +392,7 @@ export default function ControlesPage() {
                 onClick={() => selectClinic(c.key)}
                 disabled={!c.available}
                 title={c.available ? undefined : "Falta configurar el token de esta clínica"}
-                className={`relative px-4 py-2.5 text-sm font-bold transition-colors -mb-px border-b-2 ${
+                className={`relative shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-bold transition-colors -mb-px border-b-2 ${
                   active
                     ? "border-[#6469FC] text-[#6469FC]"
                     : "border-transparent text-gray-400 hover:text-gray-600"

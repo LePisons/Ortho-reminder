@@ -547,7 +547,7 @@ export default function LabPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B] flex items-center gap-3">
             <Factory className="w-7 h-7 text-[#6469FC]" />
@@ -563,7 +563,7 @@ export default function LabPage() {
       </div>
 
       {/* Clinic sub-tabs */}
-      <div className="flex items-center gap-1 border-b border-gray-100">
+      <div className="flex items-center gap-1 border-b border-gray-100 overflow-x-auto">
         {tabs.map((t) => {
           const isActive = t.key === tab;
           return (
@@ -573,7 +573,7 @@ export default function LabPage() {
               onClick={() => setTab(t.key)}
               disabled={!t.available}
               title={t.available ? undefined : "Falta configurar el token de esta clínica"}
-              className={`relative px-4 py-2.5 text-sm font-bold transition-colors -mb-px border-b-2 ${
+              className={`relative shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-bold transition-colors -mb-px border-b-2 ${
                 isActive
                   ? "border-[#6469FC] text-[#6469FC]"
                   : "border-transparent text-gray-400 hover:text-gray-600"

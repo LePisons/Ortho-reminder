@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, PanelLeftClose, PanelLeftOpen, Stethoscope, Factory } from "lucide-react";
+import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, PanelLeftClose, PanelLeftOpen, Stethoscope, Factory, Menu, X } from "lucide-react";
 import { PatientSearch } from "@/components/features/patients/patient-search";
 
 const navItems = [
@@ -114,6 +114,145 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
+/**
+ * Shared sidebar body. Rendered twice: inside the fixed desktop <aside> (with
+ * collapse support) and inside the mobile slide-over drawer (always expanded,
+ * with a close button instead of the collapse toggle).
+ */
+function SidebarContent({
+  collapsed,
+  isMobile,
+  items,
+  pathname,
+  isAuthenticated,
+  isLabTech,
+  onToggleCollapsed,
+  onClose,
+}: {
+  collapsed: boolean;
+  isMobile: boolean;
+  items: NavItem[];
+  pathname: string;
+  isAuthenticated: boolean;
+  isLabTech: boolean;
+  onToggleCollapsed?: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <>
+      {/* Logo + Collapse/Close Toggle */}
+      <div
+        className={`flex pt-7 pb-6 transition-all duration-300 ${
+          collapsed ? "px-2 flex-col items-center gap-4" : "px-6 items-center gap-3"
+        }`}
+      >
+        <Link
+          href="/"
+          title="Go to Dashboard"
+          onClick={onClose}
+          className="flex items-center gap-3 min-w-0 transition-opacity hover:opacity-80"
+        >
+          {collapsed ? (
+            <Image
+              src="/alnix-mark-white.svg"
+              alt="Alnix"
+              width={32}
+              height={32}
+              priority
+              className="h-8 w-auto shrink-0"
+            />
+          ) : (
+            <div className="flex flex-col leading-none whitespace-nowrap">
+              <Image
+                src="/alnix-logo-white.svg"
+                alt="Alnix"
+                width={120}
+                height={18}
+                priority
+                className="h-[22px] w-auto"
+              />
+              <span className="text-[10px] font-semibold tracking-[0.34em] text-white/45 mt-2">
+                ORTHOREMINDER
+              </span>
+            </div>
+          )}
+        </Link>
+
+        {isMobile ? (
+          <button
+            onClick={onClose}
+            title="Close menu"
+            aria-label="Close menu"
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white focus:outline-none"
+          >
+            <X className="h-[18px] w-[18px]" />
+          </button>
+        ) : (
+          <button
+            onClick={onToggleCollapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white focus:outline-none ${
+              collapsed ? "" : "ml-auto"
+            }`}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-[18px] w-[18px]" />
+            ) : (
+              <PanelLeftClose className="h-[18px] w-[18px]" />
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* User Section */}
+      {isAuthenticated && (
+        <div className={`shrink-0 transition-all duration-300 ${collapsed ? "px-2 pb-4" : "px-4 pb-8"}`}>
+          <UserMenu collapsed={collapsed} />
+        </div>
+      )}
+
+      {/* Patient Search (not for lab technicians — patient APIs are off-limits) */}
+      {isAuthenticated && !isLabTech && (
+        <div className={`shrink-0 transition-all duration-300 ${collapsed ? "px-2 pb-2" : "px-4 pb-4"}`}>
+          <PatientSearch collapsed={collapsed} />
+        </div>
+      )}
+
+      {/* Navigation */}
+      <nav className={`flex flex-1 flex-col gap-2 pb-6 transition-all duration-300 ${collapsed ? "px-2" : "px-4"}`}>
+        {items.map((item) => {
+          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={collapsed ? item.label : undefined}
+              onClick={onClose}
+              className={`flex items-center gap-4 py-3 text-sm transition-all duration-200 rounded-xl ${
+                collapsed ? "px-0 justify-center" : "px-3.5"
+              } ${
+                isActive
+                  ? "bg-gradient-to-br from-[#A066F8] to-[#6469FC] text-white font-bold shadow-[0_6px_18px_rgba(100,105,252,0.4)]"
+                  : "text-[#b6b6bd] hover:bg-white/[0.06] hover:text-white font-semibold"
+              }`}
+            >
+              <span className={`text-lg shrink-0 ${isActive ? 'opacity-100' : 'opacity-70'}`}>{item.icon}</span>
+              {!collapsed && <span className="whitespace-nowrap">{item.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+    </>
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -123,6 +262,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const isLabTech = user?.role === "LAB_TECH";
   const items = isLabTech ? labTechNavItems : navItems;
 
@@ -137,6 +277,11 @@ export default function DashboardLayout({
       router.replace("/lab");
     }
   }, [isLoading, isLabTech, pathname, router]);
+
+  // Close the mobile drawer on any navigation (covers UserMenu links too).
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -154,107 +299,74 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
+      {/* Desktop sidebar */}
       <aside
-        className={`relative z-10 flex flex-col bg-[#1B1B1B] text-white border-r border-black/40 shadow-2xl shrink-0 my-0 transition-all duration-300 ease-in-out overflow-hidden ${
+        className={`relative z-10 hidden md:flex flex-col bg-[#1B1B1B] text-white border-r border-black/40 shadow-2xl shrink-0 my-0 transition-all duration-300 ease-in-out overflow-hidden ${
           collapsed ? "w-[72px]" : "w-[264px]"
         }`}
       >
-        {/* Logo + Collapse Toggle */}
-        <div
-          className={`flex pt-7 pb-6 transition-all duration-300 ${
-            collapsed ? "px-2 flex-col items-center gap-4" : "px-6 items-center gap-3"
-          }`}
-        >
-          <Link
-            href="/"
-            title="Go to Dashboard"
-            className="flex items-center gap-3 min-w-0 transition-opacity hover:opacity-80"
-          >
-            {collapsed ? (
-              <Image
-                src="/alnix-mark-white.svg"
-                alt="Alnix"
-                width={32}
-                height={32}
-                priority
-                className="h-8 w-auto shrink-0"
-              />
-            ) : (
-              <div className="flex flex-col leading-none whitespace-nowrap">
-                <Image
-                  src="/alnix-logo-white.svg"
-                  alt="Alnix"
-                  width={120}
-                  height={18}
-                  priority
-                  className="h-[22px] w-auto"
-                />
-                <span className="text-[10px] font-semibold tracking-[0.34em] text-white/45 mt-2">
-                  ORTHOREMINDER
-                </span>
-              </div>
-            )}
-          </Link>
-
-          <button
-            onClick={toggleCollapsed}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white focus:outline-none ${
-              collapsed ? "" : "ml-auto"
-            }`}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="h-[18px] w-[18px]" />
-            ) : (
-              <PanelLeftClose className="h-[18px] w-[18px]" />
-            )}
-          </button>
-        </div>
-
-        {/* User Section */}
-        {isAuthenticated && (
-          <div className={`shrink-0 transition-all duration-300 ${collapsed ? "px-2 pb-4" : "px-4 pb-8"}`}>
-            <UserMenu collapsed={collapsed} />
-          </div>
-        )}
-
-        {/* Patient Search (not for lab technicians — patient APIs are off-limits) */}
-        {isAuthenticated && !isLabTech && (
-          <div className={`shrink-0 transition-all duration-300 ${collapsed ? "px-2 pb-2" : "px-4 pb-4"}`}>
-            <PatientSearch collapsed={collapsed} />
-          </div>
-        )}
-
-        {/* Navigation */}
-        <nav className={`flex flex-1 flex-col gap-2 pb-6 transition-all duration-300 ${collapsed ? "px-2" : "px-4"}`}>
-          {items.map((item) => {
-            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={collapsed ? item.label : undefined}
-                className={`flex items-center gap-4 py-3 text-sm transition-all duration-200 rounded-xl ${
-                  collapsed ? "px-0 justify-center" : "px-3.5"
-                } ${
-                  isActive
-                    ? "bg-gradient-to-br from-[#A066F8] to-[#6469FC] text-white font-bold shadow-[0_6px_18px_rgba(100,105,252,0.4)]"
-                    : "text-[#b6b6bd] hover:bg-white/[0.06] hover:text-white font-semibold"
-                }`}
-              >
-                <span className={`text-lg shrink-0 ${isActive ? 'opacity-100' : 'opacity-70'}`}>{item.icon}</span>
-                {!collapsed && <span className="whitespace-nowrap">{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
+        <SidebarContent
+          collapsed={collapsed}
+          isMobile={false}
+          items={items}
+          pathname={pathname}
+          isAuthenticated={isAuthenticated}
+          isLabTech={isLabTech}
+          onToggleCollapsed={toggleCollapsed}
+        />
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-10 flex flex-col overflow-y-auto max-h-screen relative">{children}</main>
+      {/* Mobile drawer + backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] flex-col overflow-y-auto bg-[#1B1B1B] text-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <SidebarContent
+          collapsed={false}
+          isMobile
+          items={items}
+          pathname={pathname}
+          isAuthenticated={isAuthenticated}
+          isLabTech={isLabTech}
+          onClose={() => setMobileOpen(false)}
+        />
+      </aside>
+
+      {/* Main column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar */}
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-black/40 bg-[#1B1B1B] px-4 md:hidden">
+          <button
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <Link href="/" className="flex items-center gap-2 min-w-0">
+            <Image
+              src="/alnix-logo-white.svg"
+              alt="Alnix"
+              width={96}
+              height={15}
+              priority
+              className="h-[18px] w-auto"
+            />
+          </Link>
+        </header>
+
+        <main className="relative flex flex-1 flex-col overflow-y-auto p-4 sm:p-6 lg:p-10 md:max-h-screen">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

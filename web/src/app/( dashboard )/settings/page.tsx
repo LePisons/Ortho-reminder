@@ -246,7 +246,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="clinical" className="w-full">
-        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-4" : "grid-cols-3"} mb-8`}>
+        <TabsList className={`flex w-full overflow-x-auto sm:grid ${isAdmin ? "sm:grid-cols-4" : "sm:grid-cols-3"} mb-8 [&>button]:shrink-0`}>
           <TabsTrigger value="clinical">Preferencias Clínicas</TabsTrigger>
           <TabsTrigger value="templates">Plantillas de Mensajes</TabsTrigger>
           <TabsTrigger value="account">Mi Cuenta</TabsTrigger>
@@ -508,7 +508,7 @@ export default function SettingsPage() {
                     required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-gray-700 mb-1.5 inline-block">Nueva Contraseña</Label>
                     <Input
@@ -550,7 +550,7 @@ export default function SettingsPage() {
             <div className="border-b border-red-100 px-6 py-4">
               <h2 className="text-base font-semibold text-red-700">Zona de Riesgo</h2>
             </div>
-            <div className="flex items-center justify-between p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-6">
               <div>
                 <p className="text-sm font-medium text-gray-900">Cerrar Sesión</p>
                 <p className="text-sm text-gray-500">Termina la sesión activa en este dispositivo.</p>

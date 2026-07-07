@@ -192,7 +192,7 @@ export default function PatientDetailsPage() {
           <PatientInfoCard patient={patient} onUpdate={fetchPatient} />
 
           {/* Pipeline Stage — manual override control */}
-          <div className="bg-white rounded-xl shadow-sm border px-5 py-3 flex items-center justify-between">
+          <div className="bg-white rounded-xl shadow-sm border px-5 py-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Pipeline Stage</p>
               <PipelineStageSelector patient={patient} onUpdate={fetchPatient} />
@@ -214,7 +214,7 @@ export default function PatientDetailsPage() {
           <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
 
           <Tabs defaultValue={defaultTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="flex w-full overflow-x-auto sm:grid sm:grid-cols-5 [&>button]:shrink-0">
               <TabsTrigger value="clinical">Clinical History</TabsTrigger>
               <TabsTrigger value="batch">Lab Pipeline</TabsTrigger>
               <TabsTrigger value="photos">Photos</TabsTrigger>

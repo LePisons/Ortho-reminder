@@ -117,7 +117,7 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-start gap-6">
+      <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight text-[#1B1B1B]">
             Dashboard
