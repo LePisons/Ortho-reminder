@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, ArrowRight, Clock, User, AlertCircle, Box, Upload, ShieldCheck } from "lucide-react";
+import { Loader2, ArrowRight, Clock, User, AlertCircle, Box, Upload, ShieldCheck, Send } from "lucide-react";
 
 interface PipelineData {
   REQUIRED_FILES: Patient[];
@@ -254,24 +254,35 @@ export default function PipelinePage() {
                           {/* Action Buttons */}
                           <div className="flex justify-end gap-2 border-t pt-3 border-gray-100 mt-2">
                             {col.id === 'REQUIRED_FILES' && (
-                              <div className="w-full flex gap-2">
+                              <div className="w-full flex flex-col gap-2">
                                 {activeBatch ? (
                                   <>
-                                    <input 
-                                      type="file" 
-                                      accept=".zip" 
-                                      className="hidden" 
+                                    <input
+                                      type="file"
+                                      accept=".zip"
+                                      className="hidden"
                                       id={`upload-${activeBatch.id}`}
                                       onChange={(e) => handleFileUpload(e, activeBatch.id)}
                                       disabled={actionLoading === `upload-${activeBatch.id}`}
                                     />
-                                    <Button 
+                                    <Button
                                       size="sm"
                                       onClick={() => document.getElementById(`upload-${activeBatch.id}`)?.click()}
                                       disabled={actionLoading === `upload-${activeBatch.id}`}
                                       className="w-full text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white"
                                     >
                                       {actionLoading === `upload-${activeBatch.id}` ? <Loader2 className="w-3 h-3 animate-spin"/> : <><Upload className="w-3 h-3 mr-1" /> Upload Prints (.zip)</>}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleBatchAction(activeBatch.id, 'send-order', {
+                                        expectedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                                      })}
+                                      disabled={actionLoading === activeBatch.id}
+                                      className="w-full text-xs h-8"
+                                    >
+                                      {actionLoading === activeBatch.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <><Send className="w-3 h-3 mr-1" /> Send to Lab (no files)</>}
                                     </Button>
                                   </>
                                 ) : (

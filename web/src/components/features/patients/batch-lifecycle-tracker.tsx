@@ -5,7 +5,7 @@ import { AlignerBatch, BatchStatus } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Clock, Box, UserCheck, XCircle, AlertCircle, Upload } from 'lucide-react';
+import { CheckCircle2, Clock, Box, UserCheck, XCircle, AlertCircle, Upload, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -107,7 +107,9 @@ export function BatchLifecycleTracker({
     );
   }
 
-  const currentStageIndex = STAGES.findIndex((s) => s.status === batch.status);
+  // ORDER_SENT has no dot of its own; show it on the In Production stage like the pipeline board does.
+  const effectiveStatus = batch.status === 'ORDER_SENT' ? 'IN_PRODUCTION' : batch.status;
+  const currentStageIndex = STAGES.findIndex((s) => s.status === effectiveStatus);
   const isCancelled = batch.status === 'CANCELLED';
 
   return (
@@ -161,16 +163,16 @@ export function BatchLifecycleTracker({
         {!isCancelled && (
           <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2 justify-end">
             {batch.status === 'NEEDED' && (
-               <div className="flex gap-2">
-                <input 
-                  type="file" 
-                  accept=".zip" 
-                  className="hidden" 
-                  ref={fileInputRef} 
+               <div className="flex flex-wrap gap-2">
+                <input
+                  type="file"
+                  accept=".zip"
+                  className="hidden"
+                  ref={fileInputRef}
                   onChange={handleFileUpload}
                   disabled={loadingAction === 'upload'}
                 />
-                <Button 
+                <Button
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={loadingAction === 'upload' || batch.alignerCount <= 0}
@@ -178,6 +180,18 @@ export function BatchLifecycleTracker({
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   Upload Print Files (.zip)
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAction('send-order', {
+                    expectedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                  })}
+                  disabled={loadingAction === 'send-order' || batch.alignerCount <= 0}
+                  className="w-full sm:w-auto"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Send to Lab (no files)
                 </Button>
                </div>
             )}
