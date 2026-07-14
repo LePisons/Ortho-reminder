@@ -28,6 +28,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { SettingsModule } from './settings/settings.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
 import { StorageModule } from './storage/storage.module';
+import { EstimatesModule } from './estimates/estimates.module';
 import { AuditModule } from './audit/audit.module';
 import { HealthController } from './health/health.controller';
 
@@ -62,6 +63,7 @@ import { HealthController } from './health/health.controller';
     SettingsModule,
     MessageTemplatesModule,
     ApiKeysModule,
+    EstimatesModule,
   ],
   controllers: [HealthController],
   providers: [

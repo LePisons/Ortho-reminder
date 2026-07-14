@@ -16,16 +16,20 @@ function useTabs() {
 
 interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
   defaultValue: string;
+  // Optional controlled mode: when `value` is set, the parent owns the active
+  // tab and must update it via onValueChange.
+  value?: string;
   onValueChange?: (value: string) => void;
 }
 
 const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
-  ({ className, defaultValue, onValueChange, children, ...props }, ref) => {
-    const [activeTab, setActiveTab] = React.useState(defaultValue);
+  ({ className, defaultValue, value, onValueChange, children, ...props }, ref) => {
+    const [internalTab, setInternalTab] = React.useState(defaultValue);
+    const activeTab = value ?? internalTab;
 
-    const handleTabChange = (value: string) => {
-      setActiveTab(value);
-      onValueChange?.(value);
+    const handleTabChange = (newValue: string) => {
+      if (value === undefined) setInternalTab(newValue);
+      onValueChange?.(newValue);
     };
 
     return (

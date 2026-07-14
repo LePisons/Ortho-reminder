@@ -84,6 +84,7 @@ model Patient {
   alignerChangeEvents AlignerChangeEvent[]
   appointmentRecords  AppointmentRecord[]
   onboardingToken     OnboardingToken?
+  estimates           Estimate[]
 
   @@unique([userId, rut])
   @@unique([userId, email])
@@ -173,15 +174,63 @@ enum Role {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  name      String?
-  role      Role      @default(STAFF)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  patients  Patient[]
-  apiKeys   ApiKey[]
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  password            String
+  name                String?
+  role                Role                 @default(STAFF)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  patients            Patient[]
+  apiKeys             ApiKey[]
+  estimates           Estimate[]
+  serviceCatalogItems ServiceCatalogItem[]
+}
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+/// A service/prestation in the user's editable price list for treatment
+/// estimates. `price` in CLP; null means "Consultar" (quote on request).
+model ServiceCatalogItem {
+  id        String   @id @default(cuid())
+  name      String
+  details   String?
+  price     Int?
+  sortOrder Int      @default(0)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// A generated treatment estimate (presupuesto). The PDF lives in R2 under
+/// `pdfKey`; `data` snapshots the full builder input so the estimate can be
+/// duplicated/re-edited later. Patient link is optional — `patientName` is
+/// denormalized so estimates survive patient deletion (onDelete: SetNull).
+model Estimate {
+  id          String         @id @default(cuid())
+  patientName String
+  status      EstimateStatus @default(DRAFT)
+  totalClp    Int? // null when any line item is "Consultar"
+  pdfKey      String
+  data        Json
+  patientId   String?
+  patient     Patient?       @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([patientId])
 }
 
 /// Long-lived, revocable API keys for headless/agent access (e.g. the MCP
