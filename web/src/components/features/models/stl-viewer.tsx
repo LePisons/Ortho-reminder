@@ -257,6 +257,9 @@ function Scene({
               visible={view !== "lower"}
               position={view === "both" ? openBiteOffset : undefined}
             >
+              {/* Intraoral scans are open shells — render both faces or views
+                  from below/above cull the whole surface and you "see through"
+                  the model to the inside of the front teeth. */}
               <meshStandardMaterial
                 color={JAW_MATERIAL.upper}
                 roughness={0.45}
@@ -264,6 +267,7 @@ function Scene({
                 transparent
                 opacity={upperOpacity}
                 wireframe={wireframe}
+                side={THREE.DoubleSide}
               />
             </mesh>
           )}
@@ -276,6 +280,7 @@ function Scene({
                 transparent
                 opacity={lowerOpacity}
                 wireframe={wireframe}
+                side={THREE.DoubleSide}
               />
             </mesh>
           )}
