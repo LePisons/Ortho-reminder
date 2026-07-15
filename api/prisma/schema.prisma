@@ -85,6 +85,7 @@ model Patient {
   appointmentRecords  AppointmentRecord[]
   onboardingToken     OnboardingToken?
   estimates           Estimate[]
+  modelSets           ModelSet[]
 
   @@unique([userId, rut])
   @@unique([userId, email])
@@ -119,6 +120,26 @@ model PatientImage {
   date        DateTime  @default(now())
   description String?
   category    String?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+}
+
+/// One 3D scan session: upper and/or lower jaw STL files stored privately in
+/// R2 under opaque keys (`upperKey`/`lowerKey`); signed URLs are generated on
+/// read, same pattern as PatientImage. Ownership flows through patient.userId.
+model ModelSet {
+  id        String   @id @default(cuid())
+  takenAt   DateTime @default(now()) // date of the scan; drives the timeline
+  label     String? // e.g. "Initial records", "Refinement scan"
+  upperKey  String? // R2 object key; null = jaw not uploaded
+  lowerKey  String?
+  upperSize Int? // bytes, for UI display
+  lowerSize Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   patientId String
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)

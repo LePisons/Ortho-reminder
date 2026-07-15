@@ -17,7 +17,7 @@ interface ReevaluationTrackerProps {
   generateUploadUrl: (reevalId: string) => Promise<{ uploadUrl: string; key: string }>;
 }
 
-const STAGES: { status: ReevaluationStatus; label: string; icon: React.ElementType; color: string }[] = [
+const STAGES: { status: ReevaluationStatus; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
   { status: 'NEEDED', label: 'Scan Needed', icon: AlertCircle, color: 'text-amber-500' },
   { status: 'SCAN_UPLOADED', label: 'Scan Uploaded', icon: Upload, color: 'text-blue-500' },
   { status: 'APPROVED', label: 'Approved', icon: ShieldCheck, color: 'text-green-500' },

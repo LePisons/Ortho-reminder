@@ -49,6 +49,18 @@ export class R2Service {
     return key;
   }
 
+  /**
+   * Fetch an object for server-side streaming to the client. Used when the
+   * browser needs the bytes via fetch() (e.g. STL models for the 3D viewer):
+   * signed R2 URLs would require CORS configuration on the bucket, while
+   * proxying through the API stays inside the existing CORS allowlist.
+   */
+  getObject(key: string) {
+    return this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+  }
+
   /** Generate a short-lived signed GET URL for a stored object key. */
   getSignedReadUrl(key: string, expiresInSeconds = 900): Promise<string> {
     const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });

@@ -29,6 +29,7 @@ import { SettingsModule } from './settings/settings.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
 import { StorageModule } from './storage/storage.module';
 import { EstimatesModule } from './estimates/estimates.module';
+import { ModelSetsModule } from './model-sets/model-sets.module';
 import { AuditModule } from './audit/audit.module';
 import { HealthController } from './health/health.controller';
 
@@ -64,6 +65,7 @@ import { HealthController } from './health/health.controller';
     MessageTemplatesModule,
     ApiKeysModule,
     EstimatesModule,
+    ModelSetsModule,
   ],
   controllers: [HealthController],
   providers: [

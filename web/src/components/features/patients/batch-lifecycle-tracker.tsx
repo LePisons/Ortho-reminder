@@ -17,7 +17,7 @@ interface BatchLifecycleTrackerProps {
   generateUploadUrl?: (batchId: string) => Promise<{ uploadUrl: string; key: string }>;
 }
 
-const STAGES: { status: BatchStatus; label: string; icon: React.ElementType }[] = [
+const STAGES: { status: BatchStatus; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { status: 'NEEDED', label: 'Required Files', icon: AlertCircle },
   { status: 'IN_PRODUCTION', label: 'In Production', icon: Clock },
   { status: 'DELIVERED_TO_CLINIC', label: 'Ready for Pickup', icon: Box },

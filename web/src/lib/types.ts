@@ -62,6 +62,19 @@ export interface PatientImage {
 }
 
 
+export interface ModelSet {
+  id: string;
+  takenAt: string;
+  label?: string | null;
+  upperKey?: string | null;
+  lowerKey?: string | null;
+  upperSize?: number | null;
+  lowerSize?: number | null;
+  patientId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Note {
   id: string;
   content: string;
