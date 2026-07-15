@@ -24,6 +24,7 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { Button } from "@/components/ui/button";
 import {
   Camera,
+  Compass,
   Grid3x3,
   Loader2,
   AlertTriangle,
@@ -116,6 +117,9 @@ const JAW_MATERIAL = {
   lower: "#ecdcc8", // slightly warmer so the arches read apart
 };
 
+/** Identity quaternion — scanner axes used as-is. */
+export const IDENTITY_ORIENTATION: number[] = [0, 0, 0, 1];
+
 interface SceneProps {
   upperGeometry: THREE.BufferGeometry | null;
   lowerGeometry: THREE.BufferGeometry | null;
@@ -124,6 +128,8 @@ interface SceneProps {
   lowerOpacity: number;
   wireframe: boolean;
   openBite: number; // mm the upper jaw is lifted (cosmetic)
+  /** User-set quaternion [x,y,z,w] aligning the scan with world axes. */
+  orientation: number[];
   presetCommand: { dir: [number, number, number]; nonce: number } | null;
   sync?: CameraSyncChannel;
   onReady: (gl: THREE.WebGLRenderer) => void;
@@ -137,6 +143,7 @@ function Scene({
   lowerOpacity,
   wireframe,
   openBite,
+  orientation,
   presetCommand,
   sync,
   onReady,
@@ -152,16 +159,36 @@ function Scene({
     onReady(gl);
   }, [gl, onReady]);
 
-  // Center the group on the combined bounding box and fit the camera.
-  // Re-runs when either geometry changes (e.g. switching sets in compare).
-  useEffect(() => {
+  const quaternion = useMemo(
+    () => new THREE.Quaternion().fromArray(orientation as [number, number, number, number]),
+    [orientation]
+  );
+
+  // Lift the upper jaw along the *screen's* vertical, not the scan's raw Y,
+  // so "open bite" still moves straight up after the user reorients the model.
+  const openBiteOffset = useMemo(() => {
+    return new THREE.Vector3(0, 1, 0)
+      .applyQuaternion(quaternion.clone().invert())
+      .multiplyScalar(openBite);
+  }, [quaternion, openBite]);
+
+  // Re-center the group on the combined (oriented) bounding box so the orbit
+  // pivot is always the visual middle of the model.
+  const recenter = useCallback(() => {
     const group = groupRef.current;
-    if (!group || (!upperGeometry && !lowerGeometry)) return;
+    if (!group || (!upperGeometry && !lowerGeometry)) return null;
     group.position.set(0, 0, 0);
     const box = new THREE.Box3().setFromObject(group);
-    if (box.isEmpty()) return;
+    if (box.isEmpty()) return null;
     const center = box.getCenter(new THREE.Vector3());
     group.position.copy(center.negate());
+    return box;
+  }, [upperGeometry, lowerGeometry]);
+
+  // Fit the camera when geometry loads / changes.
+  useEffect(() => {
+    const box = recenter();
+    if (!box) return;
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     fitRadius.current = Math.max(sphere.radius, 1);
     camera.position.set(0, 0, fitRadius.current * 2.4);
@@ -170,7 +197,15 @@ function Scene({
     camera.updateProjectionMatrix();
     controlsRef.current?.target.set(0, 0, 0);
     controlsRef.current?.update();
-  }, [upperGeometry, lowerGeometry, camera]);
+  }, [upperGeometry, lowerGeometry, camera, recenter]);
+
+  // On reorientation only re-center the pivot — keep the camera where it is
+  // so stepping through rotations doesn't jump the view around.
+  useEffect(() => {
+    recenter();
+    controlsRef.current?.target.set(0, 0, 0);
+    controlsRef.current?.update();
+  }, [quaternion, recenter]);
 
   // Camera preset buttons.
   useEffect(() => {
@@ -215,34 +250,36 @@ function Scene({
       <directionalLight position={[1, 2, 3]} intensity={1.4} />
       <directionalLight position={[-2, -1, -2]} intensity={0.5} />
       <group ref={groupRef}>
-        {upperGeometry && (
-          <mesh
-            geometry={upperGeometry}
-            visible={view !== "lower"}
-            position={[0, view === "both" ? openBite : 0, 0]}
-          >
-            <meshStandardMaterial
-              color={JAW_MATERIAL.upper}
-              roughness={0.45}
-              metalness={0.05}
-              transparent
-              opacity={upperOpacity}
-              wireframe={wireframe}
-            />
-          </mesh>
-        )}
-        {lowerGeometry && (
-          <mesh geometry={lowerGeometry} visible={view !== "upper"}>
-            <meshStandardMaterial
-              color={JAW_MATERIAL.lower}
-              roughness={0.45}
-              metalness={0.05}
-              transparent
-              opacity={lowerOpacity}
-              wireframe={wireframe}
-            />
-          </mesh>
-        )}
+        <group quaternion={quaternion}>
+          {upperGeometry && (
+            <mesh
+              geometry={upperGeometry}
+              visible={view !== "lower"}
+              position={view === "both" ? openBiteOffset : undefined}
+            >
+              <meshStandardMaterial
+                color={JAW_MATERIAL.upper}
+                roughness={0.45}
+                metalness={0.05}
+                transparent
+                opacity={upperOpacity}
+                wireframe={wireframe}
+              />
+            </mesh>
+          )}
+          {lowerGeometry && (
+            <mesh geometry={lowerGeometry} visible={view !== "upper"}>
+              <meshStandardMaterial
+                color={JAW_MATERIAL.lower}
+                roughness={0.45}
+                metalness={0.05}
+                transparent
+                opacity={lowerOpacity}
+                wireframe={wireframe}
+              />
+            </mesh>
+          )}
+        </group>
       </group>
       <OrbitControls
         ref={controlsRef}
@@ -260,15 +297,27 @@ export interface StlViewerProps {
   /** URLs returning raw STL bytes (fetched with credentials). */
   upperUrl?: string | null;
   lowerUrl?: string | null;
+  /** Stored orientation quaternion [x,y,z,w] for this model set. */
+  orientation?: number[] | null;
+  /** When provided, the toolbar offers an "Orientar" mode that persists. */
+  onSaveOrientation?: (quaternion: number[]) => Promise<void>;
   sync?: CameraSyncChannel;
   /** Hide the per-viewer toolbar (compare mode renders a shared one). */
   compact?: boolean;
   className?: string;
 }
 
+const ORIENT_AXES: { axis: "x" | "y" | "z"; vec: [number, number, number] }[] = [
+  { axis: "x", vec: [1, 0, 0] },
+  { axis: "y", vec: [0, 1, 0] },
+  { axis: "z", vec: [0, 0, 1] },
+];
+
 export default function StlViewer({
   upperUrl,
   lowerUrl,
+  orientation,
+  onSaveOrientation,
   sync,
   compact = false,
   className,
@@ -287,7 +336,35 @@ export default function StlViewer({
     dir: [number, number, number];
     nonce: number;
   } | null>(null);
+  const [quat, setQuat] = useState<number[]>(
+    () => orientation ?? IDENTITY_ORIENTATION
+  );
+  const [orientOpen, setOrientOpen] = useState(false);
+  const [savingOrientation, setSavingOrientation] = useState(false);
   const glRef = useRef<THREE.WebGLRenderer | null>(null);
+
+  // Rotate the model around a *world* axis (what the user sees on screen).
+  const rotate = (vec: [number, number, number], deg: number) => {
+    const step = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(...vec),
+      THREE.MathUtils.degToRad(deg)
+    );
+    const current = new THREE.Quaternion().fromArray(
+      quat as [number, number, number, number]
+    );
+    setQuat(step.multiply(current).toArray());
+  };
+
+  const saveOrientation = async () => {
+    if (!onSaveOrientation) return;
+    setSavingOrientation(true);
+    try {
+      await onSaveOrientation(quat);
+      setOrientOpen(false);
+    } finally {
+      setSavingOrientation(false);
+    }
+  };
 
   const loading = upperStatus === "loading" || lowerStatus === "loading";
   const failed = upperStatus === "error" || lowerStatus === "error";
@@ -329,6 +406,7 @@ export default function StlViewer({
             lowerOpacity={lowerOpacity}
             wireframe={wireframe}
             openBite={openBite}
+            orientation={quat}
             presetCommand={presetCommand}
             sync={sync}
             onReady={(gl) => {
@@ -442,6 +520,67 @@ export default function StlViewer({
             <Camera className="w-3.5 h-3.5 mr-1" />
             Captura
           </Button>
+          {onSaveOrientation && (
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-7 px-2 text-xs ${orientOpen ? "border-[#6469FC] text-[#6469FC]" : ""}`}
+              onClick={() => setOrientOpen((o) => !o)}
+            >
+              <Compass className="w-3.5 h-3.5 mr-1" />
+              Orientar
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!compact && orientOpen && (
+        <div className="rounded-lg border bg-gray-50 p-3 space-y-2 text-xs text-gray-700">
+          <p className="text-gray-500">
+            Gira el modelo hasta que el frente quede mirando hacia ti y el plano
+            oclusal horizontal. La orientación se guarda para este set y se usa
+            también al comparar.
+          </p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {ORIENT_AXES.map(({ axis, vec }) => (
+              <div key={axis} className="flex items-center gap-1">
+                <span className="font-semibold uppercase w-3">{axis}</span>
+                {[-90, -15, 15, 90].map((deg) => (
+                  <Button
+                    key={deg}
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-1.5 text-[11px]"
+                    onClick={() => rotate(vec, deg)}
+                  >
+                    {deg > 0 ? `+${deg}°` : `${deg}°`}
+                  </Button>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button
+              size="sm"
+              className="h-7 px-3 text-xs bg-gradient-to-r from-[#A066F8] to-[#6469FC] text-white"
+              onClick={saveOrientation}
+              disabled={savingOrientation}
+            >
+              {savingOrientation ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                "Guardar orientación"
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-3 text-xs"
+              onClick={() => setQuat(IDENTITY_ORIENTATION)}
+            >
+              Restablecer
+            </Button>
+          </div>
         </div>
       )}
     </div>

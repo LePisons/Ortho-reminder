@@ -70,6 +70,7 @@ export interface ModelSet {
   lowerKey?: string | null;
   upperSize?: number | null;
   lowerSize?: number | null;
+  orientation?: number[] | null;
   patientId: string;
   createdAt: string;
   updatedAt: string;

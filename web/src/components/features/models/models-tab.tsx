@@ -133,6 +133,25 @@ export function ModelsTab({ patientId }: ModelsTabProps) {
           <StlViewer
             upperUrl={fileUrl(mode.set, "upper")}
             lowerUrl={fileUrl(mode.set, "lower")}
+            orientation={mode.set.orientation}
+            onSaveOrientation={async (quaternion) => {
+              const res = await fetch(`${API_URL}/model-sets/${mode.set.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orientation: quaternion }),
+                credentials: "include",
+              });
+              if (!res.ok) {
+                toast.error("No se pudo guardar la orientación");
+                return;
+              }
+              const updated: ModelSet = await res.json();
+              setSets((prev) =>
+                prev.map((s) => (s.id === updated.id ? updated : s))
+              );
+              setMode({ kind: "viewer", set: updated });
+              toast.success("Orientación guardada");
+            }}
           />
         ) : (
           <CompareView sets={sets} />

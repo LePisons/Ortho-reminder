@@ -48,6 +48,7 @@ function ComparePanel({ sets, selectedId, onSelect, sync }: ComparePanelProps) {
           key={set.id}
           upperUrl={fileUrl(set, "upper")}
           lowerUrl={fileUrl(set, "lower")}
+          orientation={set.orientation}
           sync={sync}
           compact
         />

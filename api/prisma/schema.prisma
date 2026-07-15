@@ -138,6 +138,9 @@ model ModelSet {
   lowerKey  String?
   upperSize Int? // bytes, for UI display
   lowerSize Int?
+  /// Viewer orientation quaternion [x,y,z,w] set by the user to align the
+  /// scanner's arbitrary export axes with the viewer's world axes.
+  orientation Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

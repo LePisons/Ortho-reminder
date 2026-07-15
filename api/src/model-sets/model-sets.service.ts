@@ -119,6 +119,7 @@ export class ModelSetsService {
       data: {
         takenAt: dto.takenAt ? new Date(dto.takenAt) : undefined,
         label: dto.label,
+        orientation: dto.orientation,
       },
     });
   }
