@@ -131,9 +131,20 @@ interface SceneProps {
   /** User-set quaternion [x,y,z,w] aligning the scan with world axes. */
   orientation: number[];
   presetCommand: { dir: [number, number, number]; nonce: number } | null;
+  /**
+   * Orientation edits need the camera (screen axes / current view), which
+   * only exists inside the canvas — so the toolbar dispatches commands and
+   * the scene answers with the resulting quaternion.
+   */
+  orientCommand: OrientCommand | null;
+  onOrientationChange: (quaternion: number[]) => void;
   sync?: CameraSyncChannel;
   onReady: (gl: THREE.WebGLRenderer) => void;
 }
+
+export type OrientCommand =
+  | { kind: "setFront"; nonce: number }
+  | { kind: "rotate"; axis: [number, number, number]; deg: number; nonce: number };
 
 function Scene({
   upperGeometry,
@@ -145,6 +156,8 @@ function Scene({
   openBite,
   orientation,
   presetCommand,
+  orientCommand,
+  onOrientationChange,
   sync,
   onReady,
 }: SceneProps) {
@@ -215,6 +228,37 @@ function Scene({
     controlsRef.current?.target.set(0, 0, 0);
     controlsRef.current?.update();
   }, [presetCommand, camera]);
+
+  // Orientation edits. "setFront" re-expresses the model in the current
+  // camera's frame (what you see now becomes the Frente preset) and snaps
+  // the camera to Frente so the result is immediately verifiable. "rotate"
+  // spins around the camera's screen axes, not raw world axes, so the
+  // buttons feel the same from any viewpoint.
+  const lastOrientNonce = useRef(0);
+  useEffect(() => {
+    if (!orientCommand || orientCommand.nonce === lastOrientNonce.current)
+      return;
+    lastOrientNonce.current = orientCommand.nonce;
+    const current = new THREE.Quaternion().fromArray(
+      orientation as [number, number, number, number]
+    );
+    if (orientCommand.kind === "setFront") {
+      const next = camera.quaternion.clone().invert().multiply(current);
+      onOrientationChange(next.toArray());
+      camera.position.set(0, 0, fitRadius.current * 2.4);
+      controlsRef.current?.target.set(0, 0, 0);
+      controlsRef.current?.update();
+    } else {
+      const axisWorld = new THREE.Vector3(...orientCommand.axis).applyQuaternion(
+        camera.quaternion
+      );
+      const step = new THREE.Quaternion().setFromAxisAngle(
+        axisWorld,
+        THREE.MathUtils.degToRad(orientCommand.deg)
+      );
+      onOrientationChange(step.multiply(current).toArray());
+    }
+  }, [orientCommand, orientation, camera, onOrientationChange]);
 
   // Mirror remote camera poses (compare mode).
   useEffect(() => {
@@ -312,10 +356,11 @@ export interface StlViewerProps {
   className?: string;
 }
 
-const ORIENT_AXES: { axis: "x" | "y" | "z"; vec: [number, number, number] }[] = [
-  { axis: "x", vec: [1, 0, 0] },
-  { axis: "y", vec: [0, 1, 0] },
-  { axis: "z", vec: [0, 0, 1] },
+// Screen-space rotation axes: what the user perceives from any camera angle.
+const ORIENT_AXES: { label: string; vec: [number, number, number] }[] = [
+  { label: "Girar", vec: [0, 1, 0] }, // around screen vertical (left/right)
+  { label: "Inclinar", vec: [1, 0, 0] }, // around screen horizontal (up/down)
+  { label: "Rotar", vec: [0, 0, 1] }, // roll in the screen plane
 ];
 
 export default function StlViewer({
@@ -346,19 +391,15 @@ export default function StlViewer({
   );
   const [orientOpen, setOrientOpen] = useState(false);
   const [savingOrientation, setSavingOrientation] = useState(false);
+  const [orientCommand, setOrientCommand] = useState<OrientCommand | null>(
+    null
+  );
   const glRef = useRef<THREE.WebGLRenderer | null>(null);
 
-  // Rotate the model around a *world* axis (what the user sees on screen).
-  const rotate = (vec: [number, number, number], deg: number) => {
-    const step = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(...vec),
-      THREE.MathUtils.degToRad(deg)
-    );
-    const current = new THREE.Quaternion().fromArray(
-      quat as [number, number, number, number]
-    );
-    setQuat(step.multiply(current).toArray());
-  };
+  const rotate = (vec: [number, number, number], deg: number) =>
+    setOrientCommand({ kind: "rotate", axis: vec, deg, nonce: Date.now() });
+  const setFront = () =>
+    setOrientCommand({ kind: "setFront", nonce: Date.now() });
 
   const saveOrientation = async () => {
     if (!onSaveOrientation) return;
@@ -412,6 +453,8 @@ export default function StlViewer({
             wireframe={wireframe}
             openBite={openBite}
             orientation={quat}
+            orientCommand={orientCommand}
+            onOrientationChange={setQuat}
             presetCommand={presetCommand}
             sync={sync}
             onReady={(gl) => {
@@ -542,14 +585,23 @@ export default function StlViewer({
       {!compact && orientOpen && (
         <div className="rounded-lg border bg-gray-50 p-3 space-y-2 text-xs text-gray-700">
           <p className="text-gray-500">
-            Gira el modelo hasta que el frente quede mirando hacia ti y el plano
-            oclusal horizontal. La orientación se guarda para este set y se usa
+            1. Gira el modelo con el mouse hasta verlo de frente. 2. Pulsa
+            «Usar esta vista como frente». 3. Afina con los botones si hace
+            falta y guarda. La orientación queda asociada a este set y se usa
             también al comparar.
           </p>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            {ORIENT_AXES.map(({ axis, vec }) => (
-              <div key={axis} className="flex items-center gap-1">
-                <span className="font-semibold uppercase w-3">{axis}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs border-[#6469FC] text-[#6469FC]"
+              onClick={setFront}
+            >
+              Usar esta vista como frente
+            </Button>
+            {ORIENT_AXES.map(({ label, vec }) => (
+              <div key={label} className="flex items-center gap-1">
+                <span className="font-medium">{label}</span>
                 {[-90, -15, 15, 90].map((deg) => (
                   <Button
                     key={deg}
