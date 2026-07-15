@@ -31,7 +31,7 @@ interface JawSlotProps {
 function JawSlot({ label, file, onSelect }: JawSlotProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <div className="flex-1">
+    <div className="flex-1 min-w-0">
       <input
         ref={inputRef}
         type="file"
@@ -140,7 +140,7 @@ export function UploadModelSetDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !uploading && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Subir modelos 3D</DialogTitle>
           <DialogDescription>
@@ -154,7 +154,7 @@ export function UploadModelSetDialog({
             <JawSlot label="Superior" file={upper} onSelect={setUpper} />
             <JawSlot label="Inferior" file={lower} onSelect={setLower} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="model-set-date">Fecha del escaneo</Label>
               <Input
