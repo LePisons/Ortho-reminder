@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, PanelLeftClose, PanelLeftOpen, Stethoscope, Factory, Menu, X, FileText } from "lucide-react";
+import { LayoutDashboard, CalendarDays, MessageSquare, ClipboardList, Settings, PanelLeftClose, PanelLeftOpen, Stethoscope, Factory, Menu, X, FileText, Presentation } from "lucide-react";
 import { PatientSearch } from "@/components/features/patients/patient-search";
 
 const navItems = [
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/controles", label: "Controles", icon: <Stethoscope className="w-5 h-5" /> },
   { href: "/history", label: "Message History", icon: <MessageSquare className="w-5 h-5" /> },
   { href: "/presupuestos", label: "Presupuestos", icon: <FileText className="w-5 h-5" /> },
+  { href: "/presentaciones", label: "Presentaciones", icon: <Presentation className="w-5 h-5" /> },
   { href: "/settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
 

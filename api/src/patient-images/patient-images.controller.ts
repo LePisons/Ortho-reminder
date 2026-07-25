@@ -11,7 +11,10 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { Readable } from 'stream';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { randomUUID } from 'crypto';
@@ -92,6 +95,37 @@ export class PatientImagesController {
   @Get()
   findAll(@Query('patientId') patientId: string, @Request() req) {
     return this.patientImagesService.findAll(patientId, req.user.userId);
+  }
+
+  /**
+   * Streams the image bytes through the API instead of handing out a signed R2
+   * URL. Presentations need this for two reasons signed URLs can't satisfy:
+   * they expire after 15 minutes (a deck open through a consultation would go
+   * blank), and being cross-origin they taint the canvas, which breaks the
+   * jsPDF export. Same-origin through the Next `/api/*` rewrite fixes both.
+   * The photo grid keeps using signed URLs.
+   */
+  @Get(':id/file')
+  async streamFile(
+    @Param('id') id: string,
+    @Request() req,
+    @Res() res: Response,
+  ) {
+    const image = await this.patientImagesService.findOneRaw(id, req.user.userId);
+    if (image.isLegacy) {
+      // Pre-R2 rows stored an absolute URL; there is no object to stream.
+      return res.redirect(image.url);
+    }
+
+    const object = await this.r2.getObject(image.url);
+    res.setHeader('Content-Type', object.ContentType || 'image/jpeg');
+    if (object.ContentLength) {
+      res.setHeader('Content-Length', String(object.ContentLength));
+    }
+    // Keys are immutable (a replaced image gets a new UUID key), so private
+    // caching is safe and spares re-downloads while flipping through slides.
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    (object.Body as Readable).pipe(res);
   }
 
   @Get(':id')

@@ -53,6 +53,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
+import { PHOTO_CATEGORY, XRAY_CATEGORY } from "@/lib/photo-categories";
 
 // ─── Slot definitions ──────────────────────────────────────────────────────
 
@@ -68,19 +69,19 @@ const PHOTO_GRID: (SlotDef | "info")[][] = [
   // Row 1: Extraoral faces
   [
     {
-      category: "Right Profile",
+      category: PHOTO_CATEGORY.RIGHT_PROFILE,
       label: "Right Profile",
       Illustration: RightProfileSvg,
       placeholder: "/Photos_layout/Lateral.png",
     },
     {
-      category: "Frontal",
+      category: PHOTO_CATEGORY.FRONTAL,
       label: "Frontal",
       Illustration: FrontalFaceSvg,
       placeholder: "/Photos_layout/Frontal2.png",
     },
     {
-      category: "Smile",
+      category: PHOTO_CATEGORY.SMILE,
       label: "Smile",
       Illustration: SmileFaceSvg,
       placeholder: "/Photos_layout/FrontalSonrisa.png",
@@ -89,14 +90,14 @@ const PHOTO_GRID: (SlotDef | "info")[][] = [
   // Row 2: Occlusal arches + patient info center
   [
     {
-      category: "Upper Occlusal",
+      category: PHOTO_CATEGORY.UPPER_OCCLUSAL,
       label: "Upper Occlusal",
       Illustration: UpperOcclusalSvg,
       placeholder: "/Photos_layout/Intraoral_oclusal1.png",
     },
     "info",
     {
-      category: "Lower Occlusal",
+      category: PHOTO_CATEGORY.LOWER_OCCLUSAL,
       label: "Lower Occlusal",
       Illustration: LowerOcclusalSvg,
       placeholder: "/Photos_layout/Intraoral_oclusal2.png",
@@ -105,19 +106,19 @@ const PHOTO_GRID: (SlotDef | "info")[][] = [
   // Row 3: Intraoral views
   [
     {
-      category: "Intraoral Right",
+      category: PHOTO_CATEGORY.INTRAORAL_RIGHT,
       label: "Intraoral Right",
       Illustration: IntraoralRightSvg,
       placeholder: "/Photos_layout/Intraoral_Lateral_Derecha.png",
     },
     {
-      category: "Intraoral Frontal",
+      category: PHOTO_CATEGORY.INTRAORAL_FRONTAL,
       label: "Intraoral Frontal",
       Illustration: IntraoralFrontalSvg,
       placeholder: "/Photos_layout/Intraoral_Frontal.png",
     },
     {
-      category: "Intraoral Left",
+      category: PHOTO_CATEGORY.INTRAORAL_LEFT,
       label: "Intraoral Left",
       Illustration: IntraoralLeftSvg,
       placeholder: "/Photos_layout/Intraoral_Lateral_izquierda.png",
@@ -132,13 +133,13 @@ const PHOTO_SLOTS: SlotDef[] = PHOTO_GRID.flat().filter(
 
 const XRAY_SLOTS: SlotDef[] = [
   {
-    category: "Panoramic",
+    category: XRAY_CATEGORY.PANORAMIC,
     label: "Panoramic",
     Illustration: PanoramicXraySvg,
     placeholder: "/Photos_layout/Panoramic.png",
   },
   {
-    category: "Lateral",
+    category: XRAY_CATEGORY.LATERAL,
     label: "Lateral",
     Illustration: LateralXraySvg,
     placeholder: "/Photos_layout/LateralCeph.png",

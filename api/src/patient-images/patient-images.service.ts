@@ -66,6 +66,16 @@ export class PatientImagesService {
     return this.withSignedUrl(image);
   }
 
+  /**
+   * Ownership-checked lookup that keeps `url` as the raw R2 key. Used by the
+   * byte-streaming endpoint, which needs the key rather than a signed URL.
+   * Legacy rows holding an absolute http(s) URL have no key to stream.
+   */
+  async findOneRaw(id: string, userId: string) {
+    const { patient, ...image } = await this.assertImageOwnership(id, userId);
+    return { ...image, isLegacy: this.isLegacyUrl(image.url) };
+  }
+
   async update(id: string, updatePatientImageDto: UpdatePatientImageDto, userId: string) {
     await this.assertImageOwnership(id, userId);
     return this.prisma.patientImage.update({

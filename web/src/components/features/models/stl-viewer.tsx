@@ -353,6 +353,10 @@ export interface StlViewerProps {
   sync?: CameraSyncChannel;
   /** Hide the per-viewer toolbar (compare mode renders a shared one). */
   compact?: boolean;
+  /** Stretch the canvas to the parent's height instead of locking it to 4:3. */
+  fill?: boolean;
+  /** Which jaws to show on mount; defaults to the occlusion view. */
+  initialView?: JawView;
   className?: string;
 }
 
@@ -370,6 +374,8 @@ export default function StlViewer({
   onSaveOrientation,
   sync,
   compact = false,
+  fill = false,
+  initialView = "both",
   className,
 }: StlViewerProps) {
   const { geometry: upperGeometry, status: upperStatus } =
@@ -377,7 +383,7 @@ export default function StlViewer({
   const { geometry: lowerGeometry, status: lowerStatus } =
     useStlGeometry(lowerUrl);
 
-  const [view, setView] = useState<JawView>("both");
+  const [view, setView] = useState<JawView>(initialView);
   const [upperOpacity, setUpperOpacity] = useState(1);
   const [lowerOpacity, setLowerOpacity] = useState(1);
   const [wireframe, setWireframe] = useState(false);
@@ -420,15 +426,22 @@ export default function StlViewer({
   const screenshot = () => {
     const gl = glRef.current;
     if (!gl) return;
+    const dataUrl = gl.domElement.toDataURL("image/png");
     const link = document.createElement("a");
     link.download = `modelo-3d-${new Date().toISOString().slice(0, 10)}.png`;
-    link.href = gl.domElement.toDataURL("image/png");
+    link.href = dataUrl;
     link.click();
   };
 
   return (
-    <div className={`flex flex-col gap-3 ${className ?? ""}`}>
-      <div className="relative rounded-xl overflow-hidden border bg-gradient-to-b from-slate-100 to-slate-200 aspect-[4/3]">
+    <div
+      className={`flex flex-col gap-3 ${fill ? "h-full" : ""} ${className ?? ""}`}
+    >
+      <div
+        className={`relative overflow-hidden border bg-gradient-to-b from-slate-100 to-slate-200 ${
+          fill ? "h-full min-h-0 flex-1 rounded-none border-0" : "aspect-[4/3] rounded-xl"
+        }`}
+      >
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
             <Loader2 className="w-8 h-8 animate-spin text-[#6469FC]" />

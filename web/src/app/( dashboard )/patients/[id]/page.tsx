@@ -13,6 +13,7 @@ import { ClinicalTab } from "@/components/features/clinical/clinical-tab";
 import { ImagesTab } from "@/components/features/clinical/images-tab";
 import { MessagesTab } from "@/components/features/patients/messages-tab";
 import { ModelsTab } from "@/components/features/models/models-tab";
+import { PresentationsTab } from "@/components/features/presentations/presentations-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs-simple";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -215,12 +216,13 @@ export default function PatientDetailsPage() {
           <PatientSummaryCard patient={patient} onUpdate={fetchPatient} />
 
           <Tabs defaultValue={defaultTab} className="w-full">
-            <TabsList className="flex w-full overflow-x-auto sm:grid sm:grid-cols-6 [&>button]:shrink-0">
+            <TabsList className="flex w-full overflow-x-auto sm:grid sm:grid-cols-7 [&>button]:shrink-0">
               <TabsTrigger value="clinical">Clinical History</TabsTrigger>
               <TabsTrigger value="batch">Lab Pipeline</TabsTrigger>
               <TabsTrigger value="photos">Photos</TabsTrigger>
               <TabsTrigger value="xrays">X-Rays</TabsTrigger>
               <TabsTrigger value="models">Modelos 3D</TabsTrigger>
+              <TabsTrigger value="presentacion">Presentación</TabsTrigger>
               <TabsTrigger value="messages" className="relative">
                 Mensajes
                 {(patient.unreadMessagesCount ?? 0) > 0 && (
@@ -306,6 +308,12 @@ export default function PatientDetailsPage() {
             </TabsContent>
             <TabsContent value="models">
               <ModelsTab patientId={patient.id} />
+            </TabsContent>
+            <TabsContent value="presentacion">
+              <PresentationsTab
+                patient={patient}
+                images={patient.patientImages || []}
+              />
             </TabsContent>
             <TabsContent value="messages">
               <MessagesTab 
