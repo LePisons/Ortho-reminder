@@ -155,7 +155,7 @@ model ModelSet {
 /// treatment to the patient. Slides live as JSON (same pattern as `Estimate.data`)
 /// and reference media by id — `PatientImage` and `ModelSet` rows are never copied,
 /// so a deck follows the record and costs almost no storage.
-/// Ownership is doubly anchored: `userId` for direct queries, `patient` for cascade.
+/// Ownership is anchored on `userId`; `patient` additionally cascades when set.
 model Presentation {
   id        String   @id @default(cuid())
   title     String
@@ -163,8 +163,13 @@ model Presentation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  patientId String
-  patient   Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  /// Null for an external case: someone who isn't an Alnix patient, whose
+  /// records were uploaded straight into the deck as `PresentationAsset`s
+  /// rather than into a clinical record.
+  patientId String?
+  patient   Patient?            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  /// Who the deck is about when there is no patient row. Never both.
+  subjectName String?
   userId    String
   user      User                @relation(fields: [userId], references: [id])
   assets    PresentationAsset[]
@@ -190,8 +195,9 @@ model SlideTemplate {
   @@index([userId])
 }
 
-/// Images that belong to a deck but not to the clinical record: snapshots captured
-/// from the 3D viewer and images dropped straight onto a slide. Deliberately kept
+/// Files that belong to a deck but not to the clinical record: snapshots captured
+/// from the 3D viewer, images dropped straight onto a slide, and the whole record
+/// set of an external case (photos, x-rays, analyses, STL scans). Deliberately kept
 /// out of `PatientImage` so the orthodontic photo grid stays clean.
 /// `presentationId` null = owned by the user's slide library rather than one deck.
 model PresentationAsset {
@@ -200,6 +206,14 @@ model PresentationAsset {
   contentType String
   size        Int
   createdAt   DateTime @default(now())
+
+  /// Which record slot an external case's file fills — a photo category
+  /// ("Frontal"), "Panoramic", "Lateral", "CephAnalysis", "Model3dUpper".
+  /// Mirrors `PatientImage.category`; see web/src/lib/photo-categories.ts.
+  /// Null for ad-hoc uploads and 3D snapshots.
+  role  String?
+  /// Free text shown next to the file, e.g. which analysis it is ("Ricketts").
+  label String?
 
   presentationId String?
   presentation   Presentation? @relation(fields: [presentationId], references: [id], onDelete: Cascade)

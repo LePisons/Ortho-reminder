@@ -6,7 +6,13 @@ import Image from "next/image";
 import { ImageOff, Loader2, Plus } from "lucide-react";
 import { API_URL } from "@/lib/utils";
 import { ModelSet } from "@/lib/types";
-import { LayoutId, Slide, SlideItem, slideItemUrl } from "@/lib/api/presentations.api";
+import {
+  LayoutId,
+  Slide,
+  SlideItem,
+  assetFileUrl,
+  slideItemUrl,
+} from "@/lib/api/presentations.api";
 import { AnnotationLayer, SLIDE_H, SLIDE_W, Tool } from "./annotation-layer";
 
 // three.js stays out of the main bundle; only slides that need it pull it in.
@@ -101,9 +107,29 @@ function Frame({
     );
   }
 
-  if (item.kind === "model3d") {
-    const set = modelSets.find((s) => s.id === item.modelSetId);
-    if (!set) return <MissingMedia label="Escaneo no disponible" />;
+  if (item.kind === "model3d" || item.kind === "assetModel3d") {
+    // A patient's scan lives in a ModelSet; an external case's is a pair of
+    // STLs uploaded into the deck. Same viewer, different source.
+    let upperUrl: string | null = null;
+    let lowerUrl: string | null = null;
+    let orientation: number[] | null | undefined;
+    let key: string;
+
+    if (item.kind === "model3d") {
+      const set = modelSets.find((s) => s.id === item.modelSetId);
+      if (!set) return <MissingMedia label="Escaneo no disponible" />;
+      upperUrl = modelFileUrl(set, "upper");
+      lowerUrl = modelFileUrl(set, "lower");
+      orientation = set.orientation;
+      key = `${set.id}-${item.view}`;
+    } else {
+      upperUrl = item.upperAssetId ? assetFileUrl(item.upperAssetId) : null;
+      lowerUrl = item.lowerAssetId ? assetFileUrl(item.lowerAssetId) : null;
+      if (!upperUrl && !lowerUrl)
+        return <MissingMedia label="Escaneo no disponible" />;
+      key = `${item.upperAssetId ?? ""}-${item.lowerAssetId ?? ""}-${item.view}`;
+    }
+
     if (!interactive3d) {
       return (
         <div
@@ -120,10 +146,10 @@ function Frame({
         className={`h-full w-full overflow-hidden rounded-lg ${ring}`}
       >
         <StlViewer
-          key={`${set.id}-${item.view}`}
-          upperUrl={modelFileUrl(set, "upper")}
-          lowerUrl={modelFileUrl(set, "lower")}
-          orientation={set.orientation}
+          key={key}
+          upperUrl={upperUrl}
+          lowerUrl={lowerUrl}
+          orientation={orientation}
           initialView={item.view}
           compact
           fill

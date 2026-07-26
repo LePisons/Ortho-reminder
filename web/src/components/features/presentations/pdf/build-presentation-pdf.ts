@@ -7,7 +7,13 @@ import {
   SlideItem,
   slideItemUrl,
 } from "@/lib/api/presentations.api";
-import { SLIDE_W } from "../annotation-layer";
+import {
+  ANGLE_LABEL_SIZE,
+  SLIDE_W,
+  angleGeometry,
+  formatDegrees,
+  pointRadius,
+} from "../annotation-layer";
 
 // Alnix palette (hex — jsPDF has no CSS color parsing), matching
 // `estimates/pdf/build-estimate-pdf.ts`.
@@ -131,7 +137,7 @@ async function preload(
 /** A 3D frame prints its captured still, if the user made one. */
 function frameUrl(item: SlideItem | null): string | null {
   if (!item) return null;
-  if (item.kind === "model3d") {
+  if (item.kind === "model3d" || item.kind === "assetModel3d") {
     return item.snapshotAssetId
       ? slideItemUrl({ kind: "asset", assetId: item.snapshotAssetId })
       : null;
@@ -233,6 +239,7 @@ function drawAnnotations(doc: jsPDF, annotations: Annotation[]) {
     doc.setLineCap("round");
 
     switch (a.kind) {
+      case "line":
       case "arrow": {
         doc.setLineWidth(sw(a.width));
         const x1 = px(a.from[0]);
@@ -240,6 +247,7 @@ function drawAnnotations(doc: jsPDF, annotations: Annotation[]) {
         const x2 = px(a.to[0]);
         const y2 = py(a.to[1]);
         doc.line(x1, y1, x2, y2);
+        if (a.kind === "line") break;
         // Same head geometry as annotation-layer.tsx's arrowHead().
         const angle = Math.atan2(y2 - y1, x2 - x1);
         const len = Math.max(u(18), sw(a.width) * 4);
@@ -253,6 +261,39 @@ function drawAnnotations(doc: jsPDF, annotations: Annotation[]) {
           y2 - len * Math.sin(angle + spread),
           "F"
         );
+        break;
+      }
+      case "point":
+        doc.circle(px(a.x), py(a.y), u(pointRadius(a.width)), "F");
+        break;
+      case "angle": {
+        // Stage units throughout, exactly like the SVG; the page is the same
+        // 16:9 box, so one scale factor converts both axes.
+        const g = angleGeometry(a);
+        doc.setLineWidth(sw(a.width));
+        doc.line(u(g.A[0]), u(g.A[1]), u(g.V[0]), u(g.V[1]));
+        doc.line(u(g.V[0]), u(g.V[1]), u(g.B[0]), u(g.B[1]));
+        // jsPDF has no arc primitive; 24 segments over at most 180° is well
+        // under the resolution of print.
+        doc.setLineWidth(Math.max(0.3, u(Math.max(2.5, a.width * 0.7))));
+        const STEPS = 24;
+        for (let i = 0; i < STEPS; i++) {
+          const t0 = g.angA + (g.delta * i) / STEPS;
+          const t1 = g.angA + (g.delta * (i + 1)) / STEPS;
+          doc.line(
+            u(g.V[0] + Math.cos(t0) * g.radius),
+            u(g.V[1] + Math.sin(t0) * g.radius),
+            u(g.V[0] + Math.cos(t1) * g.radius),
+            u(g.V[1] + Math.sin(t1) * g.radius)
+          );
+        }
+        doc.circle(u(g.V[0]), u(g.V[1]), u(Math.max(4, a.width * 0.6)), "F");
+        doc.setFont("Montserrat", "bold");
+        doc.setFontSize(u(ANGLE_LABEL_SIZE) * 2.83);
+        doc.text(formatDegrees(g.degrees), u(g.labelAt[0]), u(g.labelAt[1]), {
+          align: "center",
+          baseline: "middle",
+        });
         break;
       }
       case "rect":

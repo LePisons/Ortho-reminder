@@ -1,8 +1,19 @@
 import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreatePresentationDto {
+  /**
+   * Omitted for an external case — a deck about someone who isn't a patient.
+   * Exactly one of `patientId` / `subjectName` is expected; the service rejects
+   * a deck that has neither.
+   */
+  @IsOptional()
   @IsString()
-  patientId: string;
+  patientId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  subjectName?: string;
 
   @IsString()
   @MaxLength(200)

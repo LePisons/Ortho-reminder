@@ -6,6 +6,12 @@ export class UpdatePresentationDto {
   @MaxLength(200)
   title?: string;
 
+  /** External cases only; renaming the subject never touches a patient row. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  subjectName?: string;
+
   @IsOptional()
   @IsArray()
   slides?: unknown[];

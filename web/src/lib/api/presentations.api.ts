@@ -35,6 +35,17 @@ export type SlideItem =
   | { kind: "patientImage"; imageId: string; fit?: "cover" | "contain" }
   | { kind: "asset"; assetId: string; fit?: "cover" | "contain" }
   | {
+      /**
+       * An external case's scan: the same live viewer as `model3d`, but reading
+       * STLs uploaded into the deck instead of a patient's `ModelSet`.
+       */
+      kind: "assetModel3d";
+      upperAssetId?: string;
+      lowerAssetId?: string;
+      view: "both" | "upper" | "lower";
+      snapshotAssetId?: string;
+    }
+  | {
       kind: "model3d";
       modelSetId: string;
       view: "both" | "upper" | "lower";
@@ -55,9 +66,32 @@ export type SlideItem =
 export type Annotation =
   | {
       id: string;
-      kind: "arrow";
+      kind: "arrow" | "line";
       from: [number, number];
       to: [number, number];
+      color: string;
+      width: number;
+    }
+  | {
+      /** A marked spot — a cephalometric landmark, a contact, a lesion. */
+      id: string;
+      kind: "point";
+      x: number;
+      y: number;
+      color: string;
+      width: number;
+    }
+  | {
+      /**
+       * Three points measuring the angle at `vertex`. The reading is computed
+       * from the geometry every time it is drawn rather than stored, so a
+       * dragged point can never disagree with its own number.
+       */
+      id: string;
+      kind: "angle";
+      a: [number, number];
+      vertex: [number, number];
+      b: [number, number];
       color: string;
       width: number;
     }
@@ -107,7 +141,10 @@ export interface Slide {
 export interface PresentationSummary {
   id: string;
   title: string;
-  patientId: string;
+  /** Null on an external case — the deck stands alone. */
+  patientId: string | null;
+  subjectName: string | null;
+  /** The patient's name, or the external subject's; always something to show. */
   patientName: string;
   slideCount: number;
   createdAt: string;
@@ -117,7 +154,8 @@ export interface PresentationSummary {
 export interface Presentation {
   id: string;
   title: string;
-  patientId: string;
+  patientId: string | null;
+  subjectName: string | null;
   userId: string;
   slides: Slide[];
   createdAt: string;
@@ -138,8 +176,14 @@ export interface PresentationAsset {
   contentType: string;
   size: number;
   presentationId: string | null;
+  /** Which record slot this file fills; see `ASSET_ROLE` in photo-categories. */
+  role: string | null;
+  label: string | null;
   createdAt: string;
 }
+
+export const isStlAsset = (a: PresentationAsset) =>
+  a.contentType === "model/stl";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -170,10 +214,12 @@ export function emptySlide(layout: LayoutId = "full"): Slide {
 export function slideItemUrl(item: SlideItem): string | null {
   if (item.kind === "patientImage")
     return `${API_URL}/patient-images/${item.imageId}/file`;
-  if (item.kind === "asset")
-    return `${API_URL}/presentations/assets/${item.assetId}/file`;
+  if (item.kind === "asset") return assetFileUrl(item.assetId);
   return null;
 }
+
+export const assetFileUrl = (assetId: string) =>
+  `${API_URL}/presentations/assets/${assetId}/file`;
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -197,8 +243,10 @@ export const PresentationsApi = {
   get: async (id: string): Promise<Presentation> =>
     json(await fetch(`${API_URL}/presentations/${id}`, { credentials: "include" })),
 
+  /** Pass `patientId` for a patient's deck, `subjectName` for an external case. */
   create: async (input: {
-    patientId: string;
+    patientId?: string;
+    subjectName?: string;
     title: string;
     slides?: Slide[];
   }): Promise<Presentation> =>
@@ -213,7 +261,7 @@ export const PresentationsApi = {
 
   update: async (
     id: string,
-    input: { title?: string; slides?: Slide[] }
+    input: { title?: string; subjectName?: string; slides?: Slide[] }
   ): Promise<Presentation> =>
     json(
       await fetch(`${API_URL}/presentations/${id}`, {
@@ -232,15 +280,22 @@ export const PresentationsApi = {
     if (!res.ok) throw new Error("No se pudo eliminar la presentación");
   },
 
-  /** Upload an image straight into a deck (or the library when id is omitted). */
+  /**
+   * Upload a file straight into a deck (or the library when id is omitted).
+   * Images, plus STL scans for an external case. `role`/`label` file it as a
+   * record so the deck can be laid out from it later.
+   */
   uploadAsset: async (
     file: Blob,
     presentationId?: string,
-    filename = "imagen.png"
+    filename = "imagen.png",
+    meta?: { role?: string; label?: string }
   ): Promise<PresentationAsset> => {
     const form = new FormData();
     form.append("file", file, filename);
     if (presentationId) form.append("presentationId", presentationId);
+    if (meta?.role) form.append("role", meta.role);
+    if (meta?.label) form.append("label", meta.label);
     return json(
       await fetch(`${API_URL}/presentations/assets`, {
         method: "POST",
@@ -248,6 +303,22 @@ export const PresentationsApi = {
         credentials: "include",
       })
     );
+  },
+
+  /** Every file uploaded into a deck — an external case's whole record set. */
+  listAssets: async (id: string): Promise<PresentationAsset[]> =>
+    json(
+      await fetch(`${API_URL}/presentations/${id}/assets`, {
+        credentials: "include",
+      })
+    ),
+
+  removeAsset: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_URL}/presentations/assets/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("No se pudo eliminar el archivo");
   },
 };
 

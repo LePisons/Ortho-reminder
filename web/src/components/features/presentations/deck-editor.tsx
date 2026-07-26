@@ -9,10 +9,13 @@ import {
   Camera,
   Check,
   Circle,
+  CircleDot,
   Copy,
+  DraftingCompass,
   FileDown,
   Library,
   Loader2,
+  Minus,
   MousePointer2,
   Pencil,
   Play,
@@ -36,6 +39,7 @@ import {
   LAYOUT_LABELS,
   LayoutId,
   Presentation,
+  PresentationAsset,
   PresentationsApi,
   Slide,
   SlideItem,
@@ -50,6 +54,13 @@ import { SlideLibraryDialog } from "./slide-library";
 const TOOLS: { id: Tool; label: string; icon: typeof MousePointer2 }[] = [
   { id: "select", label: "Seleccionar", icon: MousePointer2 },
   { id: "arrow", label: "Flecha", icon: ArrowUpRight },
+  { id: "line", label: "Línea recta", icon: Minus },
+  { id: "point", label: "Punto", icon: CircleDot },
+  {
+    id: "angle",
+    label: "Medir ángulo (3 clics: punto, vértice, punto)",
+    icon: DraftingCompass,
+  },
   { id: "ellipse", label: "Círculo", icon: Circle },
   { id: "rect", label: "Rectángulo", icon: Square },
   { id: "freehand", label: "Lápiz", icon: Pencil },
@@ -58,11 +69,19 @@ const TOOLS: { id: Tool; label: string; icon: typeof MousePointer2 }[] = [
 
 const LAYOUT_OPTIONS = Object.keys(LAYOUT_LABELS) as LayoutId[];
 
+/** Both live-scan frames: a patient's ModelSet, or an external case's STLs. */
+const is3d = (
+  f: SlideItem | null | undefined
+): f is Extract<SlideItem, { kind: "model3d" | "assetModel3d" }> =>
+  f?.kind === "model3d" || f?.kind === "assetModel3d";
+
 interface DeckEditorProps {
   deck: Presentation;
   patientName: string;
   images: PatientImage[];
   modelSets: ModelSet[];
+  /** External cases only: the deck's own records, in place of a chart. */
+  assets?: PresentationAsset[];
   onBack: () => void;
   onDeckChange?: (deck: Presentation) => void;
 }
@@ -72,6 +91,7 @@ export function DeckEditor({
   patientName,
   images,
   modelSets,
+  assets,
   onBack,
   onDeckChange,
 }: DeckEditorProps) {
@@ -224,7 +244,7 @@ export function DeckEditor({
    * imperative handle through `next/dynamic`.
    */
   const capture3d = async () => {
-    const frameIndex = current?.frames.findIndex((f) => f?.kind === "model3d");
+    const frameIndex = current?.frames.findIndex((f) => is3d(f));
     if (frameIndex === undefined || frameIndex < 0) return;
     const canvas = canvasRef.current?.querySelector("canvas");
     if (!canvas) {
@@ -243,7 +263,7 @@ export function DeckEditor({
         "modelo-3d.png"
       );
       const frame = current.frames[frameIndex];
-      if (frame?.kind === "model3d") {
+      if (is3d(frame)) {
         setFrame(frameIndex, { ...frame, snapshotAssetId: asset.id });
       }
       toast.success("Vista 3D guardada para el PDF");
@@ -453,7 +473,7 @@ export function DeckEditor({
                     className="w-20 accent-[#6469FC]"
                   />
                 </label>
-                {current.frames.some((f) => f?.kind === "model3d") && (
+                {current.frames.some(is3d) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -682,6 +702,7 @@ export function DeckEditor({
         onOpenChange={(o) => !o && setPickerFrame(null)}
         images={images}
         modelSets={modelSets}
+        assets={assets}
         presentationId={deck.id}
         onPick={(item) => {
           if (pickerFrame !== null) setFrame(pickerFrame, item);
@@ -706,6 +727,7 @@ function describeFrame(item: SlideItem | null): string {
     case "asset":
       return "Imagen subida";
     case "model3d":
+    case "assetModel3d":
       return "Modelo 3D";
     case "text":
       return item.body.slice(0, 22) || "Texto";

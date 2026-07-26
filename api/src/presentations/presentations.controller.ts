@@ -21,10 +21,12 @@ import { PresentationsService } from './presentations.service';
 import { CreatePresentationDto } from './dto/create-presentation.dto';
 import { UpdatePresentationDto } from './dto/update-presentation.dto';
 import { detectImageContentType } from '../storage/image-validation';
+import { isValidStl } from '../storage/stl-validation';
+import { STL_CONTENT_TYPE } from '../model-sets/model-sets.service';
 
-// Slide images are screen-resolution, not archival scans; 20 MB matches the
-// patient-images cap.
-const MAX_ASSET_BYTES = 20 * 1024 * 1024;
+// Slide images are screen-resolution, not archival scans, but an external
+// case's scans arrive here too — same 60 MB ceiling as /model-sets.
+const MAX_ASSET_BYTES = 60 * 1024 * 1024;
 
 @Controller('presentations')
 export class PresentationsController {
@@ -49,20 +51,23 @@ export class PresentationsController {
   )
   async uploadAsset(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { presentationId?: string },
+    @Body() body: { presentationId?: string; role?: string; label?: string },
     @Request() req,
   ) {
     if (!file) throw new BadRequestException('File is required');
-    // Verify real image bytes rather than trusting the client's Content-Type.
-    const contentType = detectImageContentType(file.buffer);
+    // Verify the real bytes rather than trusting the client's Content-Type.
+    const contentType =
+      detectImageContentType(file.buffer) ??
+      (isValidStl(file.buffer) ? STL_CONTENT_TYPE : null);
     if (!contentType) {
-      throw new BadRequestException('Unsupported or invalid image file');
+      throw new BadRequestException('Unsupported or invalid file');
     }
     return this.presentations.createAsset(
       req.user.userId,
       file,
       contentType,
       body.presentationId || undefined,
+      { role: body.role || undefined, label: body.label || undefined },
     );
   }
 
@@ -96,6 +101,12 @@ export class PresentationsController {
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
     return this.presentations.findOne(id, req.user.userId);
+  }
+
+  /** The deck's own files — an external case's records live here. */
+  @Get(':id/assets')
+  findAssets(@Param('id') id: string, @Request() req) {
+    return this.presentations.findAssets(id, req.user.userId);
   }
 
   @Patch(':id')

@@ -8,10 +8,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  CircleDot,
+  DraftingCompass,
   Eraser,
   Loader2,
   Maximize,
   Minimize,
+  Minus,
   MousePointer2,
   Pencil,
   Save,
@@ -36,6 +39,14 @@ const DRAW_TOOLS: { id: Tool; label: string; icon: typeof Circle; key: string }[
   [
     { id: "select", label: "Puntero", icon: MousePointer2, key: "v" },
     { id: "arrow", label: "Flecha", icon: ArrowUpRight, key: "a" },
+    { id: "line", label: "Línea recta", icon: Minus, key: "n" },
+    { id: "point", label: "Punto", icon: CircleDot, key: "o" },
+    {
+      id: "angle",
+      label: "Medir ángulo (3 clics)",
+      icon: DraftingCompass,
+      key: "g",
+    },
     { id: "ellipse", label: "Círculo", icon: Circle, key: "c" },
     { id: "rect", label: "Rectángulo", icon: Square, key: "r" },
     { id: "freehand", label: "Lápiz", icon: Pencil, key: "p" },
@@ -71,11 +82,15 @@ export default function PresentPage() {
       try {
         const loaded = await PresentationsApi.get(id);
         setDeck(loaded);
-        const res = await fetch(
-          `${API_URL}/model-sets?patientId=${loaded.patientId}`,
-          { credentials: "include" }
-        );
-        if (res.ok) setModelSets(await res.json());
+        // An external case has no chart: its scans are deck assets, which the
+        // slide reads by id on its own.
+        if (loaded.patientId) {
+          const res = await fetch(
+            `${API_URL}/model-sets?patientId=${loaded.patientId}`,
+            { credentials: "include" }
+          );
+          if (res.ok) setModelSets(await res.json());
+        }
       } catch (e) {
         setError((e as Error).message);
       }

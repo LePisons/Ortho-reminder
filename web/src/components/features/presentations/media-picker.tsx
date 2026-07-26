@@ -14,10 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ModelSet, PatientImage } from "@/lib/types";
-import { categoryLabel } from "@/lib/photo-categories";
+import { ASSET_ROLE, categoryLabel, roleLabel } from "@/lib/photo-categories";
 import {
+  PresentationAsset,
   PresentationsApi,
   SlideItem,
+  assetFileUrl,
+  isStlAsset,
   slideItemUrl,
 } from "@/lib/api/presentations.api";
 
@@ -30,11 +33,23 @@ const TABS: { id: TabId; label: string; icon: typeof Camera }[] = [
   { id: "TEXT", label: "Texto", icon: Type },
 ];
 
+/** Which records tab an external case's asset belongs under. */
+const XRAY_ROLES: string[] = [
+  ASSET_ROLE.PANORAMIC,
+  ASSET_ROLE.LATERAL,
+  ASSET_ROLE.CEPH_ANALYSIS,
+];
+
 interface MediaPickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   images: PatientImage[];
   modelSets: ModelSet[];
+  /**
+   * An external case's own records. When given, the deck has no patient and
+   * these stand in for the chart's photos, x-rays and scans.
+   */
+  assets?: PresentationAsset[];
   /** Uploads are filed under this deck; omit to store in the slide library. */
   presentationId?: string;
   onPick: (item: SlideItem) => void;
@@ -45,6 +60,7 @@ export function MediaPicker({
   onOpenChange,
   images,
   modelSets,
+  assets,
   presentationId,
   onPick,
 }: MediaPickerProps) {
@@ -52,6 +68,8 @@ export function MediaPicker({
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const external = !!assets;
 
   const sessions = useMemo(() => {
     const type = tab === "XRAY" ? "XRAY" : "PHOTO";
@@ -65,6 +83,21 @@ export function MediaPicker({
     }
     return [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [images, tab]);
+
+  /** The external case's images for the current tab, in intake order. */
+  const assetsForTab = useMemo(() => {
+    if (!assets) return [];
+    return assets.filter((a) => {
+      if (isStlAsset(a)) return false;
+      const inXray = !!a.role && XRAY_ROLES.includes(a.role);
+      return tab === "XRAY" ? inXray : !inXray;
+    });
+  }, [assets, tab]);
+
+  const stlAssets = useMemo(
+    () => (assets ?? []).filter(isStlAsset),
+    [assets]
+  );
 
   const choose = (item: SlideItem) => {
     onPick(item);
@@ -94,7 +127,9 @@ export function MediaPicker({
         <DialogHeader>
           <DialogTitle>Elegir contenido</DialogTitle>
           <DialogDescription>
-            Usa los registros del paciente o sube una imagen nueva.
+            {external
+              ? "Usa los registros de este caso o sube una imagen nueva."
+              : "Usa los registros del paciente o sube una imagen nueva."}
           </DialogDescription>
         </DialogHeader>
 
@@ -116,7 +151,46 @@ export function MediaPicker({
         </div>
 
         <div className="max-h-[55vh] min-h-[16rem] overflow-y-auto pr-1">
-          {(tab === "PHOTO" || tab === "XRAY") && (
+          {/* An external case's records: no sessions to group by, just what was
+              uploaded into the deck. */}
+          {external && (tab === "PHOTO" || tab === "XRAY") && (
+            <div>
+              {assetsForTab.length === 0 ? (
+                <p className="py-10 text-center text-sm text-gray-500">
+                  Este caso aún no tiene{" "}
+                  {tab === "PHOTO" ? "fotos" : "radiografías ni análisis"}.
+                </p>
+              ) : (
+                <div className="grid grid-cols-4 gap-3">
+                  {assetsForTab.map((asset) => (
+                    <button
+                      key={asset.id}
+                      onClick={() =>
+                        choose({
+                          kind: "asset",
+                          assetId: asset.id,
+                          fit: "contain",
+                        })
+                      }
+                      className="group overflow-hidden rounded-lg border transition-all hover:border-[#6469FC] hover:shadow-md"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={assetFileUrl(asset.id)}
+                        alt=""
+                        className="aspect-square w-full bg-gray-50 object-contain"
+                      />
+                      <span className="block truncate px-1.5 py-1 text-[11px] text-gray-500">
+                        {asset.label || roleLabel(asset.role)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!external && (tab === "PHOTO" || tab === "XRAY") && (
             <div className="space-y-5">
               {sessions.length === 0 && (
                 <p className="py-10 text-center text-sm text-gray-500">
@@ -164,7 +238,64 @@ export function MediaPicker({
             </div>
           )}
 
-          {tab === "MODEL" && (
+          {external && tab === "MODEL" && (
+            <div className="space-y-2">
+              {stlAssets.length === 0 ? (
+                <p className="py-10 text-center text-sm text-gray-500">
+                  Este caso no tiene modelos 3D.
+                </p>
+              ) : (
+                <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">Escaneo del caso</p>
+                    <p className="text-xs text-gray-500">
+                      Se mostrará en vivo, girable durante la presentación.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    {(
+                      [
+                        { v: "both", label: "Oclusión" },
+                        { v: "upper", label: "Superior" },
+                        { v: "lower", label: "Inferior" },
+                      ] as const
+                    ).map((o) => {
+                      const upper = stlAssets.find(
+                        (a) => a.role === ASSET_ROLE.MODEL_UPPER
+                      );
+                      const lower = stlAssets.find(
+                        (a) => a.role === ASSET_ROLE.MODEL_LOWER
+                      );
+                      return (
+                        <Button
+                          key={o.v}
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            (o.v === "upper" && !upper) ||
+                            (o.v === "lower" && !lower) ||
+                            (o.v === "both" && !(upper && lower))
+                          }
+                          onClick={() =>
+                            choose({
+                              kind: "assetModel3d",
+                              upperAssetId: upper?.id,
+                              lowerAssetId: lower?.id,
+                              view: o.v,
+                            })
+                          }
+                        >
+                          {o.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!external && tab === "MODEL" && (
             <div className="space-y-2">
               {modelSets.length === 0 && (
                 <p className="py-10 text-center text-sm text-gray-500">

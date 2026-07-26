@@ -4,7 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Library, Loader2, Play, Presentation, Trash2, User } from "lucide-react";
+import {
+  Library,
+  Loader2,
+  Pencil,
+  Play,
+  Presentation,
+  Trash2,
+  User,
+  UserPlus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -78,10 +87,22 @@ export default function PresentacionesPage() {
             paciente.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setLibraryOpen(true)}>
-          <Library className="mr-1.5 h-4 w-4" />
-          Biblioteca de diapositivas
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLibraryOpen(true)}>
+            <Library className="mr-1.5 h-4 w-4" />
+            Biblioteca de diapositivas
+          </Button>
+          {/* Opens in its own tab: the intake is a long form, and it usually
+              happens while the patient's own record is still open elsewhere. */}
+          <Button
+            size="sm"
+            onClick={() => window.open("/presentaciones/nuevo-caso", "_blank")}
+            className="bg-gradient-to-r from-[#A066F8] to-[#6469FC] text-white"
+          >
+            <UserPlus className="mr-1.5 h-4 w-4" />
+            Caso externo
+          </Button>
+        </div>
       </div>
 
       <Input
@@ -106,7 +127,8 @@ export default function PresentacionesPage() {
           {decks.length === 0 && (
             <p className="max-w-md text-center text-xs">
               Abre la ficha de un paciente y usa la pestaña «Presentación» para
-              generar una a partir de sus registros.
+              generar una a partir de sus registros, o crea un «Caso externo»
+              subiendo los registros de alguien que no es paciente.
             </p>
           )}
         </div>
@@ -116,7 +138,14 @@ export default function PresentacionesPage() {
             <Card key={deck.id} className="transition-shadow hover:shadow-md">
               <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div className="min-w-0">
-                  <p className="font-semibold">{deck.title}</p>
+                  <p className="flex items-center gap-2 font-semibold">
+                    {deck.title}
+                    {!deck.patientId && (
+                      <span className="rounded-full bg-[#6469FC]/10 px-2 py-0.5 text-[11px] font-semibold text-[#6469FC]">
+                        Externo
+                      </span>
+                    )}
+                  </p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
                     <User className="h-3 w-3" />
                     {deck.patientName} · {deck.slideCount}{" "}
@@ -127,12 +156,18 @@ export default function PresentacionesPage() {
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Button size="sm" variant="outline" asChild>
-                    <Link
-                      href={`/patients/${deck.patientId}?tab=presentacion`}
-                    >
-                      Abrir ficha
+                    <Link href={`/presentaciones/${deck.id}`}>
+                      <Pencil className="mr-1.5 h-4 w-4" />
+                      Editar
                     </Link>
                   </Button>
+                  {deck.patientId && (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/patients/${deck.patientId}?tab=presentacion`}>
+                        Abrir ficha
+                      </Link>
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -175,8 +210,10 @@ export default function PresentacionesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar esta presentación?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará «{pendingDelete?.title}» de {pendingDelete?.patientName}.
-              Las fotos, radiografías y modelos del paciente no se tocan.
+              Se eliminará «{pendingDelete?.title}» de {pendingDelete?.patientName}.{" "}
+              {pendingDelete?.patientId
+                ? "Las fotos, radiografías y modelos del paciente no se tocan."
+                : "Se eliminarán también los registros que subiste dentro de este caso, que no existen en ninguna otra parte."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

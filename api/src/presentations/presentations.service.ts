@@ -11,6 +11,14 @@ import { R2Service } from '../storage/r2.service';
 import { CreatePresentationDto } from './dto/create-presentation.dto';
 import { UpdatePresentationDto } from './dto/update-presentation.dto';
 import { extensionForContentType } from '../storage/image-validation';
+import { STL_CONTENT_TYPE } from '../model-sets/model-sets.service';
+
+/** Assets are images plus, for external cases, the case's own STL scans. */
+function assetExtension(contentType: string): string {
+  return contentType === STL_CONTENT_TYPE
+    ? 'stl'
+    : extensionForContentType(contentType);
+}
 
 @Injectable()
 export class PresentationsService {
@@ -39,10 +47,17 @@ export class PresentationsService {
   // ── Decks ────────────────────────────────────────────────────────────────
 
   async create(dto: CreatePresentationDto, userId: string) {
-    await this.assertPatientOwnership(dto.patientId, userId);
+    if (dto.patientId) {
+      await this.assertPatientOwnership(dto.patientId, userId);
+    } else if (!dto.subjectName?.trim()) {
+      throw new BadRequestException(
+        'A presentation needs either a patient or a subject name',
+      );
+    }
     return this.prisma.presentation.create({
       data: {
-        patientId: dto.patientId,
+        patientId: dto.patientId ?? null,
+        subjectName: dto.patientId ? null : dto.subjectName!.trim(),
         userId,
         title: dto.title,
         slides: (dto.slides ?? []) as Prisma.InputJsonValue,
@@ -64,7 +79,8 @@ export class PresentationsService {
     });
     return decks.map(({ slides, patient, ...deck }) => ({
       ...deck,
-      patientName: patient.fullName,
+      // External decks have no patient; the subject name stands in for one.
+      patientName: patient?.fullName ?? deck.subjectName ?? 'Caso externo',
       slideCount: Array.isArray(slides) ? slides.length : 0,
     }));
   }
@@ -79,6 +95,7 @@ export class PresentationsService {
       where: { id },
       data: {
         title: dto.title,
+        subjectName: dto.subjectName,
         slides:
           dto.slides === undefined
             ? undefined
@@ -112,10 +129,11 @@ export class PresentationsService {
     file: { buffer: Buffer; size: number },
     contentType: string,
     presentationId?: string,
+    meta?: { role?: string; label?: string },
   ) {
     if (presentationId) await this.assertOwnership(presentationId, userId);
     const scope = presentationId ?? 'library';
-    const key = `presentations/${userId}/${scope}/${randomUUID()}.${extensionForContentType(contentType)}`;
+    const key = `presentations/${userId}/${scope}/${randomUUID()}.${assetExtension(contentType)}`;
     await this.r2.putObject(key, file.buffer, contentType);
     try {
       return await this.prisma.presentationAsset.create({
@@ -125,12 +143,35 @@ export class PresentationsService {
           size: file.size,
           userId,
           presentationId: presentationId ?? null,
+          role: meta?.role ?? null,
+          label: meta?.label ?? null,
         },
       });
     } catch (e) {
       await this.r2.deleteObject(key).catch(() => undefined);
       throw e;
     }
+  }
+
+  /**
+   * Every file uploaded into a deck. An external case's records live here
+   * rather than on the patient, so this is what its media picker browses.
+   */
+  async findAssets(presentationId: string, userId: string) {
+    await this.assertOwnership(presentationId, userId);
+    return this.prisma.presentationAsset.findMany({
+      where: { presentationId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        contentType: true,
+        size: true,
+        role: true,
+        label: true,
+        presentationId: true,
+        createdAt: true,
+      },
+    });
   }
 
   async findAsset(id: string, userId: string) {
