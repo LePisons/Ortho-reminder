@@ -28,14 +28,18 @@ export class EmailProvider implements IMessagingProvider {
     recipient: string,
     content: string,
     subject?: string,
+    idempotencyKey?: string,
   ): Promise<MessageResult> {
     try {
-      const result = await this.resend.emails.send({
-        from: this.fromEmail,
-        to: recipient,
-        subject: subject ?? 'Solicitud de alineadores — Alnix',
-        html: content,
-      });
+      const result = await this.resend.emails.send(
+        {
+          from: this.fromEmail,
+          to: recipient,
+          subject: subject ?? 'Solicitud de alineadores — Alnix',
+          html: content,
+        },
+        idempotencyKey ? { idempotencyKey } : undefined,
+      );
 
       if (result.error) {
         this.logger.error(`Resend API Error: ${result.error.message}`);

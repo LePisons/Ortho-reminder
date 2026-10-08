@@ -4,6 +4,9 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CombinedAuthGuard } from './auth/combined-auth.guard';
 import { LabTechGuard } from './auth/lab-tech.guard';
+import { ExternalAccessGuard } from './auth/external-access.guard';
+import { CookieOriginGuard } from './auth/cookie-origin.guard';
+import { ReferralsModule } from './referrals/referrals.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -44,6 +47,7 @@ import { HealthController } from './health/health.controller';
       },
     ]),
     StorageModule,
+    ReferralsModule,
     AuditModule,
     PatientsModule,
     ScheduleModule.forRoot(),
@@ -85,6 +89,8 @@ import { HealthController } from './health/health.controller';
       provide: APP_GUARD,
       useClass: LabTechGuard,
     },
+    { provide: APP_GUARD, useClass: ExternalAccessGuard },
+    { provide: APP_GUARD, useClass: CookieOriginGuard },
     // Rate-limit every route; tighten specific routes with @Throttle()
     {
       provide: APP_GUARD,

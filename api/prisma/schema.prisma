@@ -87,6 +87,7 @@ model Patient {
   estimates           Estimate[]
   modelSets           ModelSet[]
   presentations       Presentation[]
+  referrals           Referral[]
 
   @@unique([userId, rut])
   @@unique([userId, email])
@@ -269,6 +270,7 @@ enum Role {
   ADMIN
   STAFF
   LAB_TECH
+  REFERRER
 }
 
 model User {
@@ -286,6 +288,110 @@ model User {
   presentations       Presentation[]
   slideTemplates      SlideTemplate[]
   presentationAssets  PresentationAsset[]
+  disabledAt          DateTime?
+  mustChangePassword  Boolean @default(false)
+  sessionVersion      Int @default(0)
+  referralOwnerId     String?
+  referralOwner       User? @relation("Colleagues", fields: [referralOwnerId], references: [id])
+  colleagues          User[] @relation("Colleagues")
+  sentReferrals       Referral[] @relation("ReferrerCases")
+  receivedReferrals   Referral[] @relation("OwnerCases")
+}
+
+enum ReferralStatus {
+  DRAFT
+  SUBMITTED
+  NEEDS_INFO
+  ACCEPTED
+}
+
+model Referral {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation("OwnerCases", fields: [ownerId], references: [id])
+  referrerId String
+  referrer User @relation("ReferrerCases", fields: [referrerId], references: [id])
+  patientId String?
+  patient Patient? @relation(fields: [patientId], references: [id])
+  fullName String
+  rut String
+  email String
+  phone String
+  reason String
+  treatment Json?
+  status ReferralStatus @default(DRAFT)
+  revokedAt DateTime?
+  submittedAt DateTime?
+  acceptedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  files ReferralFile[]
+  comments ReferralComment[]
+  setups ReferralSetup[]
+  @@index([ownerId, status])
+  @@index([referrerId, revokedAt])
+  @@index([patientId])
+}
+
+// Originals are immutable. Future automatic crops must be separate assets.
+model ReferralFile {
+  id String @id @default(cuid())
+  referralId String
+  referral Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  key String @unique
+  name String
+  kind String
+  photoView String @default("UNASSIGNED")
+  contentType String
+  size Int
+  uploadedBy String
+  createdAt DateTime @default(now())
+  @@index([referralId])
+}
+
+model ReferralNotificationEvent {
+  id String @id @default(cuid())
+  referralId String
+  action String
+  createdAt DateTime @default(now())
+  deliveryId String?
+  @@index([deliveryId, createdAt])
+}
+
+model ReferralNotificationDelivery {
+  id String @id @default(cuid())
+  referralId String
+  ownerId String
+  recipient String
+  actions String[]
+  status String @default("PENDING")
+  attempts Int @default(0)
+  availableAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  sentAt DateTime?
+  @@index([status, availableAt])
+}
+
+model ReferralComment {
+  id String @id @default(cuid())
+  referralId String
+  referral Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  authorId String
+  authorName String
+  content String
+  createdAt DateTime @default(now())
+  @@index([referralId])
+}
+
+model ReferralSetup {
+  id String @id @default(cuid())
+  referralId String
+  referral Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  title String
+  url String
+  createdBy String
+  createdAt DateTime @default(now())
+  @@index([referralId])
 }
 
 enum EstimateStatus {

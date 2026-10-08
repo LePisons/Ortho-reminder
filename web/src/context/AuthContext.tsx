@@ -8,7 +8,8 @@ interface User {
   id: string;
   email: string;
   name?: string;
-  role?: 'ADMIN' | 'STAFF' | 'LAB_TECH';
+  role?: 'ADMIN' | 'STAFF' | 'LAB_TECH' | 'REFERRER';
+  mustChangePassword?: boolean;
   createdAt?: string;
 }
 
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async () => {
     const loggedIn = await checkAuth();
     // Lab technicians only have access to the lab board.
-    router.push(loggedIn?.role === 'LAB_TECH' ? '/lab' : '/');
+    router.push(loggedIn?.mustChangePassword ? '/cambiar-clave' : loggedIn?.role === 'REFERRER' ? '/derivaciones' : loggedIn?.role === 'LAB_TECH' ? '/lab' : '/');
   };
 
   const logout = async () => {

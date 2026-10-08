@@ -83,7 +83,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
       {open && (
         <div className={`absolute top-full ${collapsed ? "left-full ml-2" : "left-0 right-0"} mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 min-w-[200px]`}>
           <div className="p-1.5">
-            {user?.role !== "LAB_TECH" && (<>
+            {user?.role !== "LAB_TECH" && user?.role !== "REFERRER" && (<>
             <Link
               href="/settings"
               onClick={() => setOpen(false)}
@@ -266,7 +266,16 @@ export default function DashboardLayout({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isLabTech = user?.role === "LAB_TECH";
-  const items = isLabTech ? labTechNavItems : navItems;
+  const isReferrer = user?.role === "REFERRER";
+  const referralItem = { href: "/derivaciones", label: isReferrer ? "Mis derivaciones" : "Derivaciones", icon: <Stethoscope className="w-5 h-5" /> };
+  const items = isReferrer ? [referralItem] : isLabTech ? labTechNavItems : user?.role === 'ADMIN' ? [...navItems.slice(0, -1), referralItem, navItems[navItems.length - 1]] : navItems;
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated) router.replace('/login');
+    else if (user?.mustChangePassword) router.replace('/cambiar-clave');
+    else if (isReferrer && pathname !== '/derivaciones' && !pathname.startsWith('/derivaciones/')) router.replace('/derivaciones');
+  }, [isLoading, isAuthenticated, user?.mustChangePassword, isReferrer, pathname, router]);
 
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
@@ -291,7 +300,7 @@ export default function DashboardLayout({
     localStorage.setItem("sidebar-collapsed", String(next));
   };
 
-  if (isLoading) {
+  if (isLoading || !isAuthenticated || user?.mustChangePassword || (isReferrer && pathname !== '/derivaciones' && !pathname.startsWith('/derivaciones/'))) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#6469FC]" />
@@ -313,7 +322,7 @@ export default function DashboardLayout({
           items={items}
           pathname={pathname}
           isAuthenticated={isAuthenticated}
-          isLabTech={isLabTech}
+          isLabTech={isLabTech || isReferrer}
           onToggleCollapsed={toggleCollapsed}
         />
       </aside>
@@ -337,7 +346,7 @@ export default function DashboardLayout({
           items={items}
           pathname={pathname}
           isAuthenticated={isAuthenticated}
-          isLabTech={isLabTech}
+          isLabTech={isLabTech || isReferrer}
           onClose={() => setMobileOpen(false)}
         />
       </aside>

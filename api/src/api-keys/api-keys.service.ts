@@ -107,7 +107,7 @@ export class ApiKeysService {
       where: { prefix },
       include: { user: true },
     });
-    if (!record || record.revokedAt) {
+    if (!record || record.revokedAt || record.user.disabledAt || record.user.mustChangePassword || record.user.role === 'REFERRER') {
       return null;
     }
     const matches = await bcrypt.compare(raw, record.hashedKey);

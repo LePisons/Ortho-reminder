@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { NotesPanel } from "@/components/features/dashboard/notes-panel";
 import { BatchLifecycleTracker } from "@/components/features/patients/batch-lifecycle-tracker";
 import { ReevaluationTracker } from "@/components/features/patients/reevaluation-tracker";
+import { PatientReferrals } from "@/components/features/referrals/patient-referrals";
 
 export default function PatientDetailsPage() {
   const params = useParams();
@@ -192,6 +193,7 @@ export default function PatientDetailsPage() {
         {/* Main Content */}
         <div className="xl:col-span-3 space-y-6">
           <PatientInfoCard patient={patient} onUpdate={fetchPatient} />
+          <PatientReferrals patientId={id} />
 
           {/* Pipeline Stage — manual override control */}
           <div className="bg-white rounded-xl shadow-sm border px-5 py-3 flex flex-wrap items-center justify-between gap-2">
