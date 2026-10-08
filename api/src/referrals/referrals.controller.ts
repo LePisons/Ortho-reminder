@@ -33,6 +33,8 @@ import {
   SharePatientDto,
   UploadReferralFileDto,
   PhotoViewDto,
+  SetupDecisionDto,
+  ReferralStageDto,
 } from './referrals.dto';
 
 @Controller('referrals')
@@ -159,6 +161,27 @@ export class ReferralsController {
   @Roles(Role.ADMIN)
   duplicates(@Param('id') id: string, @Request() req) {
     return this.referrals.duplicates(id, req.user);
+  }
+
+  @Post(':id/setups/:setupId/decision')
+  @Roles(Role.REFERRER)
+  decideSetup(
+    @Param('id') id: string,
+    @Param('setupId') setupId: string,
+    @Body() dto: SetupDecisionDto,
+    @Request() req,
+  ) {
+    return this.referrals.decideSetup(id, setupId, dto, req.user);
+  }
+
+  @Patch(':id/stage')
+  @Roles(Role.ADMIN)
+  stage(
+    @Param('id') id: string,
+    @Body() dto: ReferralStageDto,
+    @Request() req,
+  ) {
+    return this.referrals.changeStage(id, dto, req.user);
   }
 
   @Post(':id/accept')

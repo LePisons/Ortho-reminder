@@ -11,7 +11,8 @@ import {
   Colleague,
   ReferralSummary,
   referralRequest,
-  referralStatus,
+  referralStages,
+  referralNextStep,
 } from "@/lib/api/referrals.api";
 import { primaryAction } from "@/components/features/referrals/referral-ui";
 import { Plus, ArrowUpRight, Users, FolderOpen } from "lucide-react";
@@ -334,6 +335,11 @@ export default function ReferralsPage() {
                   >
                     <div className="min-w-0">
                       <h2 className="font-semibold">{c.fullName}</h2>
+                      {!c.revokedAt && (
+                        <p className="mt-1 max-w-xl text-sm text-foreground/80">
+                          {referralNextStep[c.stage]}
+                        </p>
+                      )}
                       <p className="mt-1 text-sm text-muted-foreground">
                         {admin && `${c.referrer.name || c.referrer.email} · `}
                         {c._count.files} archivos · {c._count.comments}{" "}
@@ -346,7 +352,7 @@ export default function ReferralsPage() {
                       >
                         {c.revokedAt
                           ? "Acceso revocado"
-                          : referralStatus[c.status]}
+                          : referralStages[c.stage]}
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">
                         Abrir caso <ArrowUpRight size={15} />

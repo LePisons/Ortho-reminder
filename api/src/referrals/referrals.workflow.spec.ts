@@ -40,10 +40,12 @@ describe('Referral workflow', () => {
         create: jest.fn().mockResolvedValue({ id: 'file' }),
       },
       user: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ name: 'Profesional', email: 'owner@example.test' }),
         findUnique: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
+      referralTimelineEvent: { create: jest.fn().mockResolvedValue({}) },
       referralNotificationEvent: { create: jest.fn().mockResolvedValue({}) },
     };
     db.$transaction = jest.fn(async (callback: any) => callback(db));

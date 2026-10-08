@@ -320,6 +320,7 @@ model Referral {
   reason String
   treatment Json?
   status ReferralStatus @default(DRAFT)
+  stage String @default("DRAFT")
   revokedAt DateTime?
   submittedAt DateTime?
   acceptedAt DateTime?
@@ -328,6 +329,7 @@ model Referral {
   files ReferralFile[]
   comments ReferralComment[]
   setups ReferralSetup[]
+  timeline ReferralTimelineEvent[]
   @@index([ownerId, status])
   @@index([referrerId, revokedAt])
   @@index([patientId])
@@ -391,7 +393,23 @@ model ReferralSetup {
   url String
   createdBy String
   createdAt DateTime @default(now())
+  decision String?
+  decisionNote String?
+  decidedAt DateTime?
+  decidedBy String?
+  decidedByName String?
   @@index([referralId])
+}
+
+model ReferralTimelineEvent {
+  id String @id @default(cuid())
+  referralId String
+  referral Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  stage String
+  actorName String
+  note String?
+  createdAt DateTime @default(now())
+  @@index([referralId, createdAt])
 }
 
 enum EstimateStatus {

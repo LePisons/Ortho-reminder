@@ -62,6 +62,16 @@ La migración agrega tablas y campos; no elimina datos. El script `start:prod` e
 
 ## Verificación local
 
+### Aprobación, checklist y seguimiento (8 de octubre de 2026)
+
+- La aceptación de la derivación inicia planificación. El administrador comparte una versión de setup y el caso pasa a revisión del colega. Solo el derivador asignado puede aprobar o pedir cambios en la última versión pendiente; los cambios requieren observaciones. Cada decisión es inmutable y conserva autor, fecha y versión. Una versión nueva exige nueva aprobación.
+- El administrador registra fabricación únicamente desde aprobación del último setup y entrega desde fabricación. Volver a planificación requiere una nota y una nueva versión para continuar. Estos estados no generan órdenes de laboratorio ni cambian el tratamiento interno del paciente.
+- Los cambios se serializan mediante bloqueo de la fila de derivación y vuelven a comprobar permisos y revocación dentro de la transacción. Los intentos con estado desactualizado se rechazan.
+- El historial compartido muestra estado, autor, fecha y observaciones. Los casos existentes reciben un estado inicial según su situación, sin inventar decisiones ni fechas históricas.
+- Checklist: STL superior/inferior e indicaciones obligatorios; ocho vistas fotográficas y radiografías disponibles como pendientes informativos. Las fotos sin clasificar no completan vistas. Se puede enviar sin completar los elementos opcionales tras confirmar en la interfaz; no se exige realizar nuevos exámenes.
+- Las aprobaciones y solicitudes de cambio del colega entran en el sistema existente de avisos al propietario.
+- Migración aditiva `20261008010000_referral_workflow`, verificada sobre el respaldo local restaurado. Prueba real local de concurrencia y flujo completo aprobada. Pruebas HTTP de acceso ajeno, caso revocado, roles y decisión inválida añadidas. Revisión visual con datos ficticios y comprobación móvil a 390 px sin desbordamiento.
+
 ### Avisos de actividad por correo
 
 Los cambios realizados por cuentas REFERRER generan eventos persistentes en la misma transacción que la acción. Incluyen creación del borrador, cambios en antecedentes/tratamiento, envío a revisión, comentarios, carga de archivos y clasificación de fotos. Las lecturas, descargas y acciones del administrador no envían avisos. No se importan acciones históricas.

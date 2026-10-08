@@ -15,6 +15,7 @@ import {
   extensionForContentType,
 } from '../storage/image-validation';
 import { isValidStl } from '../storage/stl-validation';
+import { referralChecklist } from './referral-checklist';
 import {
   AcceptReferralDto,
   CreateColleagueDto,
@@ -22,6 +23,8 @@ import {
   SetupDto,
   SharePatientDto,
   PHOTO_VIEWS,
+  SetupDecisionDto,
+  ReferralStageDto,
 } from './referrals.dto';
 
 export interface ReferralActor {
@@ -102,6 +105,8 @@ export class ReferralsService {
         'COMMENT',
         'UPLOAD',
         'PHOTO_CLASSIFIED',
+        'SETUP_APPROVED',
+        'SETUP_CHANGES_REQUESTED',
       ].includes(action)
     ) {
       await tx.referralNotificationEvent.create({
@@ -197,6 +202,7 @@ export class ReferralsService {
         id: true,
         fullName: true,
         status: true,
+        stage: true,
         revokedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -234,7 +240,8 @@ export class ReferralsService {
         referrer: { select: personSelect },
         files: { select: fileSelect, orderBy: { createdAt: 'asc' } },
         comments: { orderBy: { createdAt: 'asc' } },
-        setups: { orderBy: { createdAt: 'desc' } },
+        setups: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+        timeline: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
       },
     });
     if (!record) throw new NotFoundException();
@@ -252,6 +259,7 @@ export class ReferralsService {
       : null;
     return {
       ...record,
+      checklist: referralChecklist(record),
       sharedProgress,
       patientId: actor.role === 'ADMIN' ? record.patientId : undefined,
     };
@@ -327,11 +335,16 @@ export class ReferralsService {
         );
       const changed = await tx.referral.updateMany({
         where: { id, ...this.scope(actor), status: record.status },
-        data: { status: 'SUBMITTED', submittedAt: new Date() },
+        data: {
+          status: 'SUBMITTED',
+          stage: 'RECEIVED',
+          submittedAt: new Date(),
+        },
       });
       if (!changed.count)
         throw new ConflictException('El caso cambió. Actualiza la página.');
       await this.audit(tx, actor, 'SUBMIT', id);
+      await this.timeline(tx, id, 'RECEIVED', actor);
       return { success: true };
     });
   }
@@ -362,7 +375,9 @@ export class ReferralsService {
         },
         data: {
           updatedAt: new Date(),
-          ...(requestInfo ? { status: 'NEEDS_INFO' as const } : {}),
+          ...(requestInfo
+            ? { status: 'NEEDS_INFO' as const, stage: 'NEEDS_INFO' }
+            : {}),
         },
       });
       if (!changed.count)
@@ -376,6 +391,8 @@ export class ReferralsService {
         },
       });
       await this.audit(tx, actor, requestInfo ? 'REQUEST_INFO' : 'COMMENT', id);
+      if (requestInfo)
+        await this.timeline(tx, id, 'NEEDS_INFO', actor, content.trim());
       return comment;
     });
   }
@@ -387,15 +404,159 @@ export class ReferralsService {
     if (url.protocol !== 'https:' || url.username || url.password)
       throw new BadRequestException('Usa un enlace HTTPS sin credenciales.');
     return this.prisma.$transaction(async (tx) => {
+      const record = await this.lockWorkflow(tx, id, actor);
+      if (
+        record.status !== 'ACCEPTED' ||
+        ['MANUFACTURING', 'DELIVERED'].includes(record.stage)
+      )
+        throw new ConflictException(
+          'Acepta la derivación antes de compartir un setup. Si ya está en fabricación, vuelve primero a planificación.',
+        );
       const setup = await tx.referralSetup.create({
         data: { ...dto, referralId: id, createdBy: actor.userId },
       });
       await tx.referral.update({
         where: { id },
-        data: { updatedAt: new Date() },
+        data: { stage: 'REVIEW', updatedAt: new Date() },
       });
       await this.audit(tx, actor, 'SETUP_SHARED', id);
+      await this.timeline(
+        tx,
+        id,
+        'REVIEW',
+        actor,
+        `Setup compartido: ${dto.title}`,
+      );
       return setup;
+    });
+  }
+
+  private async lockWorkflow(
+    tx: Prisma.TransactionClient,
+    id: string,
+    actor: ReferralActor,
+  ) {
+    // Serialize decisions/new versions/stage changes on the case row and recheck scope.
+    const changed = await tx.referral.updateMany({
+      where: { id, ...this.scope(actor), revokedAt: null },
+      data: { updatedAt: new Date() },
+    });
+    if (!changed.count)
+      throw new NotFoundException('Derivación no disponible.');
+    return tx.referral.findUniqueOrThrow({ where: { id } });
+  }
+
+  private async timeline(
+    tx: Prisma.TransactionClient,
+    id: string,
+    stage: string,
+    actor: ReferralActor,
+    note?: string,
+  ) {
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: actor.userId },
+      select: { name: true, email: true },
+    });
+    await tx.referralTimelineEvent.create({
+      data: { referralId: id, stage, actorName: user.name || user.email, note },
+    });
+  }
+
+  async decideSetup(
+    id: string,
+    setupId: string,
+    dto: SetupDecisionDto,
+    actor: ReferralActor,
+  ) {
+    if (actor.role !== 'REFERRER') throw new ForbiddenException();
+    await this.access(id, actor);
+    if (dto.decision === 'CHANGES_REQUESTED' && !dto.note?.trim())
+      throw new BadRequestException('Describe los cambios que necesitas.');
+    return this.prisma.$transaction(async (tx) => {
+      const record = await this.lockWorkflow(tx, id, actor);
+      const latest = await tx.referralSetup.findFirst({
+        where: { referralId: id },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      });
+      if (
+        record.status !== 'ACCEPTED' ||
+        record.stage !== 'REVIEW' ||
+        !latest ||
+        latest.id !== setupId ||
+        latest.decision
+      )
+        throw new ConflictException(
+          'Solo puedes responder al último setup pendiente. Actualiza el caso.',
+        );
+      const user = await tx.user.findUniqueOrThrow({
+        where: { id: actor.userId },
+        select: { name: true, email: true },
+      });
+      await tx.referralSetup.update({
+        where: { id: setupId },
+        data: {
+          decision: dto.decision,
+          decisionNote: dto.note?.trim() || null,
+          decidedAt: new Date(),
+          decidedBy: actor.userId,
+          decidedByName: user.name || user.email,
+        },
+      });
+      const stage = dto.decision === 'APPROVED' ? 'APPROVED' : 'PLANNING';
+      await tx.referral.update({ where: { id }, data: { stage } });
+      await this.timeline(
+        tx,
+        id,
+        stage,
+        actor,
+        `${dto.decision === 'APPROVED' ? 'Aprobó' : 'Solicitó cambios en'}: ${latest.title}${dto.note?.trim() ? `. ${dto.note.trim()}` : ''}`,
+      );
+      await this.audit(
+        tx,
+        actor,
+        dto.decision === 'APPROVED'
+          ? 'SETUP_APPROVED'
+          : 'SETUP_CHANGES_REQUESTED',
+        id,
+        { setupId },
+      );
+      return { success: true };
+    });
+  }
+
+  async changeStage(id: string, dto: ReferralStageDto, actor: ReferralActor) {
+    this.admin(actor);
+    await this.access(id, actor);
+    return this.prisma.$transaction(async (tx) => {
+      const record = await this.lockWorkflow(tx, id, actor);
+      if (record.status !== 'ACCEPTED' || record.stage !== dto.expectedStage)
+        throw new ConflictException('El estado cambió. Actualiza el caso.');
+      const allowed: Record<string, string[]> = {
+        PLANNING: ['REVIEW', 'APPROVED', 'MANUFACTURING', 'DELIVERED'],
+        MANUFACTURING: ['APPROVED'],
+        DELIVERED: ['MANUFACTURING'],
+      };
+      if (!allowed[dto.stage]?.includes(record.stage))
+        throw new ConflictException('Este cambio de estado no está permitido.');
+      if (dto.stage === 'PLANNING' && !dto.note?.trim())
+        throw new BadRequestException('Indica por qué vuelve a planificación.');
+      if (dto.stage === 'MANUFACTURING') {
+        const latest = await tx.referralSetup.findFirst({
+          where: { referralId: id },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        });
+        if (latest?.decision !== 'APPROVED')
+          throw new ConflictException(
+            'El último setup debe estar aprobado por el colega.',
+          );
+      }
+      await tx.referral.update({ where: { id }, data: { stage: dto.stage } });
+      await this.timeline(tx, id, dto.stage, actor, dto.note?.trim());
+      await this.audit(tx, actor, 'STAGE_CHANGED', id, {
+        from: record.stage,
+        to: dto.stage,
+      });
+      return { success: true };
     });
   }
 
@@ -483,9 +644,15 @@ export class ReferralsService {
           }
           await tx.referral.update({
             where: { id },
-            data: { status: 'ACCEPTED', acceptedAt: new Date(), patientId },
+            data: {
+              status: 'ACCEPTED',
+              stage: 'PLANNING',
+              acceptedAt: new Date(),
+              patientId,
+            },
           });
           await this.audit(tx, actor, 'ACCEPT', id, { patientId });
+          await this.timeline(tx, id, 'PLANNING', actor);
           return { patientId };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -528,10 +695,12 @@ export class ReferralsService {
           phone: patient.phone,
           reason: dto.reason,
           status: 'ACCEPTED',
+          stage: 'PLANNING',
           acceptedAt: new Date(),
         },
       });
       await this.audit(tx, actor, 'SHARE_PATIENT', record.id);
+      await this.timeline(tx, record.id, 'PLANNING', actor);
       return record;
     });
   }

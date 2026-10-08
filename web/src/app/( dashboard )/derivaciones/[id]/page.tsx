@@ -7,6 +7,10 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  CaseWorkflow,
+  SetupVersions,
+} from "@/components/features/referrals/case-workflow";
 import { PhotoWorkspace } from "@/components/features/referrals/photo-workspace";
 import {
   panel,
@@ -19,13 +23,12 @@ import {
   fileKinds,
   ReferralDetail,
   referralRequest,
-  referralStatus,
+  referralStages,
 } from "@/lib/api/referrals.api";
 import { API_URL } from "@/lib/utils";
 import {
   ArrowLeft,
   Download,
-  ExternalLink,
   FileBox,
   Send,
   ClipboardList,
@@ -138,7 +141,7 @@ export default function ReferralDetailPage() {
               <p className="mb-3 inline-flex rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
                 {record.revokedAt
                   ? "Acceso del colega revocado"
-                  : referralStatus[record.status]}
+                  : referralStages[record.stage]}
               </p>
               <h1 className="text-3xl font-semibold tracking-tight">
                 {record.fullName}
@@ -176,13 +179,22 @@ export default function ReferralDetailPage() {
               {!admin && editable && active && (
                 <Button
                   className={primaryAction}
-                  disabled={busy || !bothStls}
-                  onClick={() =>
+                  disabled={busy || !bothStls || !record.checklist?.canSubmit}
+                  onClick={() => {
+                    if (
+                      record.checklist.items.some(
+                        (i) => !i.required && !i.complete,
+                      ) &&
+                      !window.confirm(
+                        "Hay fotografías o radiografías pendientes. ¿Enviar con los antecedentes disponibles?",
+                      )
+                    )
+                      return;
                     void action(async () => {
                       await referralRequest(`/${id}/submit`, "POST");
                       setEditing(false);
-                    }, "Derivación enviada para revisión.")
-                  }
+                    }, "Derivación enviada para revisión.");
+                  }}
                 >
                   <Send size={16} />
                   Enviar derivación
@@ -196,6 +208,13 @@ export default function ReferralDetailPage() {
               el caso. Puedes volver más tarde para completar el borrador.
             </p>
           )}
+          <CaseWorkflow
+            record={record}
+            admin={admin}
+            busy={busy}
+            action={action}
+            onSection={setSection}
+          />
           <nav
             aria-label="Secciones del caso"
             className="flex flex-wrap gap-2 rounded-2xl border bg-card p-2"
@@ -623,69 +642,60 @@ export default function ReferralDetailPage() {
                     Aún no hay un setup compartido.
                   </p>
                 )}
-                {record.setups.map((s) => (
-                  <a
-                    key={s.id}
-                    href={s.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    referrerPolicy="no-referrer"
-                    className="block rounded-lg border p-3 hover:bg-muted"
-                  >
-                    <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                      {s.title}
-                      <ExternalLink size={15} />
-                    </span>
-                    <time className="mt-2 block text-xs text-muted-foreground">
-                      {new Date(s.createdAt).toLocaleDateString("es-CL")}
-                    </time>
-                  </a>
-                ))}
-                {admin && active && (
-                  <form
-                    className="space-y-3 border-t pt-4"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void action(async () => {
-                        await referralRequest(`/${id}/setups`, "POST", {
-                          title,
-                          url,
-                        });
-                        setTitle("");
-                        setUrl("");
-                      }, "Setup compartido.");
-                    }}
-                  >
-                    <label className="block space-y-2 text-sm">
-                      Nombre y versión
-                      <Input
-                        required
-                        minLength={2}
-                        maxLength={160}
-                        placeholder="Setup inicial — versión 1"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                      />
-                    </label>
-                    <label className="block space-y-2 text-sm">
-                      Enlace HTTPS
-                      <Input
-                        required
-                        type="url"
-                        maxLength={2048}
-                        placeholder="https://…"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                      />
-                    </label>
-                    <Button
-                      className={`${primaryAction} w-full`}
-                      disabled={busy}
+                <SetupVersions
+                  record={record}
+                  admin={admin}
+                  busy={busy}
+                  action={action}
+                />
+                {admin &&
+                  active &&
+                  record.status === "ACCEPTED" &&
+                  !["MANUFACTURING", "DELIVERED"].includes(record.stage) && (
+                    <form
+                      className="space-y-3 border-t pt-4"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void action(async () => {
+                          await referralRequest(`/${id}/setups`, "POST", {
+                            title,
+                            url,
+                          });
+                          setTitle("");
+                          setUrl("");
+                        }, "Setup compartido.");
+                      }}
                     >
-                      Compartir setup
-                    </Button>
-                  </form>
-                )}
+                      <label className="block space-y-2 text-sm">
+                        Nombre y versión
+                        <Input
+                          required
+                          minLength={2}
+                          maxLength={160}
+                          placeholder="Setup inicial — versión 1"
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                        />
+                      </label>
+                      <label className="block space-y-2 text-sm">
+                        Enlace HTTPS
+                        <Input
+                          required
+                          type="url"
+                          maxLength={2048}
+                          placeholder="https://…"
+                          value={url}
+                          onChange={(e) => setUrl(e.target.value)}
+                        />
+                      </label>
+                      <Button
+                        className={`${primaryAction} w-full`}
+                        disabled={busy}
+                      >
+                        Compartir setup
+                      </Button>
+                    </form>
+                  )}
               </section>
             </aside>
           </div>

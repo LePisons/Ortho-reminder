@@ -11,6 +11,8 @@ const labels: Record<string, string> = {
   COMMENT: 'Añadió un comentario',
   UPLOAD: 'Adjuntó archivos',
   PHOTO_CLASSIFIED: 'Cambió la clasificación de fotografías',
+  SETUP_APPROVED: 'Aprobó el setup compartido',
+  SETUP_CHANGES_REQUESTED: 'Solicitó cambios en el setup',
 };
 export function referralNotificationHtml(actions: string[], link: string) {
   const counts = new Map<string, number>();

@@ -81,6 +81,15 @@ export class SetupDto {
   @MaxLength(2048)
   url: string;
 }
+export class SetupDecisionDto {
+  @IsIn(['APPROVED', 'CHANGES_REQUESTED']) decision: string;
+  @IsOptional() @IsString() @MaxLength(5000) note?: string;
+}
+export class ReferralStageDto {
+  @IsIn(['PLANNING', 'MANUFACTURING', 'DELIVERED']) stage: string;
+  @IsString() @MaxLength(30) expectedStage: string;
+  @IsOptional() @IsString() @MaxLength(2000) note?: string;
+}
 export class AcceptReferralDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) patientId?: string;
 }

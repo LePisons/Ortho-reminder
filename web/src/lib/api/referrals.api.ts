@@ -38,6 +38,30 @@ export const referralStatus: Record<string, string> = {
   NEEDS_INFO: "Faltan antecedentes",
   ACCEPTED: "Aceptada",
 };
+export const referralStages: Record<string, string> = {
+  DRAFT: "Borrador",
+  RECEIVED: "Recibido",
+  NEEDS_INFO: "Faltan antecedentes",
+  PLANNING: "En planificación",
+  REVIEW: "Revisión del colega",
+  APPROVED: "Setup aprobado",
+  MANUFACTURING: "En fabricación",
+  DELIVERED: "Entregado",
+};
+export const referralNextStep: Record<string, string> = {
+  DRAFT: "Colega: completa los antecedentes y envía la derivación.",
+  RECEIVED:
+    "Especialista: revisa los antecedentes y acepta la derivación o solicita información.",
+  NEEDS_INFO:
+    "Colega: revisa la conversación, completa lo solicitado y vuelve a enviar.",
+  PLANNING: "Especialista: prepara y comparte una nueva versión del setup.",
+  REVIEW: "Colega: revisa el último setup y apruébalo o solicita cambios.",
+  APPROVED:
+    "Especialista: revisa la aprobación y registra el inicio de fabricación.",
+  MANUFACTURING: "Especialista: registra la entrega cuando corresponda.",
+  DELIVERED:
+    "Entrega registrada. El historial y los archivos siguen disponibles.",
+};
 export const fileKinds: Record<string, string> = {
   STL_UPPER: "STL superior",
   STL_LOWER: "STL inferior",
@@ -45,6 +69,7 @@ export const fileKinds: Record<string, string> = {
   XRAY: "Radiografía (imagen)",
 };
 export interface ReferralSummary {
+  stage: string;
   id: string;
   fullName: string;
   status: string;
@@ -133,6 +158,24 @@ export const photoViews: Record<string, string> = {
   OCCLUSAL_LOWER: "Oclusal inferior",
 };
 export interface ReferralDetail extends ReferralInput {
+  stage: string;
+  checklist: {
+    canSubmit: boolean;
+    items: {
+      key: string;
+      label: string;
+      complete: boolean;
+      required: boolean;
+      section: string;
+    }[];
+  };
+  timeline: {
+    id: string;
+    stage: string;
+    actorName: string;
+    note?: string;
+    createdAt: string;
+  }[];
   sharedProgress?: {
     status: string;
     currentAligner: number;
@@ -158,5 +201,14 @@ export interface ReferralDetail extends ReferralInput {
     content: string;
     createdAt: string;
   }[];
-  setups: { id: string; title: string; url: string; createdAt: string }[];
+  setups: {
+    id: string;
+    title: string;
+    url: string;
+    createdAt: string;
+    decision: string | null;
+    decisionNote: string | null;
+    decidedByName: string | null;
+    decidedAt: string | null;
+  }[];
 }
