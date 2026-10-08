@@ -6,10 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ReferralDetail,
   referralStages,
-  referralNextStep,
   photoViews,
   referralRequest,
 } from "@/lib/api/referrals.api";
+import { CaseProgress } from "./case-progress";
 import { primaryAction } from "./referral-ui";
 
 type Props = {
@@ -36,21 +36,14 @@ export function CaseWorkflow({ record, admin, busy, action }: Props) {
       aria-label="Seguimiento del caso"
     >
       <div className="h-1 bg-gradient-to-r from-[#A066F8] to-[#6469FC]" />
-      <div className="px-5 py-4 sm:px-6">
-        <div className="space-y-2">
-          <h2 className="text-base font-semibold">
-            {referralStages[stage] || "Seguimiento"}
-          </h2>
-          <p className="text-sm leading-6 text-foreground/70">
-            {record.revokedAt
-              ? "El acceso del colega está revocado."
-              : referralNextStep[stage]}
-          </p>
+      <CaseProgress record={record} />
+      <div className="px-5 sm:px-6">
+        <div>
           {admin &&
             !record.revokedAt &&
             record.status === "ACCEPTED" &&
             targets.length > 0 && (
-              <div className="space-y-3 border-l-2 border-[#6469FC] pl-4">
+              <div className="mb-5 space-y-3 border-l-2 border-[#6469FC] pl-4">
                 <label className="block space-y-2 text-sm">
                   Nota del cambio (obligatoria para volver a planificación)
                   <Textarea
@@ -103,7 +96,7 @@ export function CaseWorkflow({ record, admin, busy, action }: Props) {
       </div>
       <details className="border-t border-[#6469FC]/10 px-5 py-3 sm:px-6">
         <summary className="cursor-pointer text-sm font-semibold">
-          Historial de estados y decisiones
+          Ver historial de estados y decisiones
         </summary>
         <p className="mt-3 text-xs text-muted-foreground">
           Recibido → Planificación → Revisión → Aprobado → Fabricación →
