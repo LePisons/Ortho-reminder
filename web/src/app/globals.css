@@ -58,7 +58,7 @@
 
 :root {
   --radius: 0.75rem;
-  --background: #F4F2EC; /* Warm cream canvas */
+  --background: #F0EEE9; /* Alnix brand canvas */
   --foreground: #1B1B1B; /* Ink */
   --card: #ffffff;
   --card-foreground: #1B1B1B;
@@ -68,8 +68,8 @@
   --primary-foreground: #ffffff;
   --secondary: #ECECFE; /* Soft indigo */
   --secondary-foreground: #5a5ff2;
-  --muted: #F4F2EC;
-  --muted-foreground: #8a8a93;
+  --muted: #F0EEE9;
+  --muted-foreground: #686874;
   --accent: #F3EAFE; /* Soft purple */
   --accent-foreground: #6469FC;
   --destructive: #D6443B;

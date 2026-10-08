@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CaseWorkflow,
+  SectionChecklist,
   SetupVersions,
 } from "@/components/features/referrals/case-workflow";
 import { PhotoWorkspace } from "@/components/features/referrals/photo-workspace";
@@ -105,7 +106,7 @@ export default function ReferralDetailPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-4 text-[#1B1B1B] dark:text-foreground">
       <Link
         href="/derivaciones"
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -136,14 +137,14 @@ export default function ReferralDetailPage() {
         !error && <p role="status">Cargando caso…</p>
       ) : (
         <>
-          <header className="flex flex-wrap justify-between gap-5 rounded-2xl border bg-card p-6 sm:p-8">
+          <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#6469FC]/15 bg-card p-5 sm:px-6">
             <div>
-              <p className="mb-3 inline-flex rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+              <p className="mb-2 inline-flex rounded-full bg-[#6469FC]/10 px-3 py-1 text-xs font-semibold text-[#5559d9]">
                 {record.revokedAt
                   ? "Acceso del colega revocado"
                   : referralStages[record.stage]}
               </p>
-              <h1 className="text-3xl font-semibold tracking-tight">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 {record.fullName}
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -202,22 +203,15 @@ export default function ReferralDetailPage() {
               )}
             </div>
           </header>
-          {!admin && editable && (
-            <p className="text-sm text-muted-foreground">
-              Guarda los datos y adjunta los STL superior e inferior para enviar
-              el caso. Puedes volver más tarde para completar el borrador.
-            </p>
-          )}
           <CaseWorkflow
             record={record}
             admin={admin}
             busy={busy}
             action={action}
-            onSection={setSection}
           />
           <nav
             aria-label="Secciones del caso"
-            className="flex flex-wrap gap-2 rounded-2xl border bg-card p-2"
+            className="grid grid-cols-2 gap-1.5 rounded-2xl border border-[#6469FC]/15 bg-card p-2 lg:grid-cols-4"
           >
             {[
               {
@@ -236,12 +230,31 @@ export default function ReferralDetailPage() {
                 className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary ${section === item.key ? "bg-brand-blue-strong text-white" : "text-foreground/70 hover:bg-secondary"}`}
               >
                 <item.icon size={17} />
-                {item.label}
+                <span className="min-w-0 text-left">{item.label}</span>
+                {record.checklist?.items.some(
+                  (i) => i.section === item.key,
+                ) && (
+                  <span
+                    className={`ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-xs ${section === item.key ? "bg-white/20" : "bg-[#6469FC]/10 text-[#5559d9]"}`}
+                  >
+                    {
+                      record.checklist.items.filter(
+                        (i) => i.section === item.key && i.complete,
+                      ).length
+                    }
+                    /
+                    {
+                      record.checklist.items.filter(
+                        (i) => i.section === item.key,
+                      ).length
+                    }
+                  </span>
+                )}
               </button>
             ))}
           </nav>
-          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-8">
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="min-w-0 space-y-4">
               <section
                 hidden={section !== "treatment"}
                 className={`${panel} space-y-5`}
@@ -260,6 +273,7 @@ export default function ReferralDetailPage() {
                     </Button>
                   )}
                 </div>
+                <SectionChecklist record={record} section="treatment" />
                 {editing ? (
                   <ReferralForm
                     initial={record}
@@ -315,6 +329,7 @@ export default function ReferralDetailPage() {
                   Los archivos de esta sección son compartidos. Conservamos los
                   originales; los nuevos archivos se agregan al historial.
                 </p>
+                <SectionChecklist record={record} section="files" />
                 {record.files.some((f) => f.kind.startsWith("STL_")) && (
                   <>
                     <Button
@@ -331,19 +346,6 @@ export default function ReferralDetailPage() {
                     )}
                   </>
                 )}
-                <div className="flex flex-wrap gap-2">
-                  {["STL_UPPER", "STL_LOWER"].map((k) => (
-                    <span
-                      key={k}
-                      className={`rounded-full px-3 py-1 text-xs ${record.files.some((f) => f.kind === k) ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}
-                    >
-                      {fileKinds[k]}:{" "}
-                      {record.files.some((f) => f.kind === k)
-                        ? "adjunto"
-                        : "pendiente"}
-                    </span>
-                  ))}
-                </div>
                 {record.files.filter((f) => f.kind !== "PHOTO").length === 0 ? (
                   <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                     <FileBox className="mx-auto mb-2" />
@@ -446,7 +448,10 @@ export default function ReferralDetailPage() {
                   </form>
                 )}
               </section>
-              <div hidden={section !== "photos"}>
+              <div hidden={section !== "photos"} className="space-y-4">
+                {section === "photos" && (
+                  <SectionChecklist record={record} section="photos" />
+                )}
                 <PhotoWorkspace record={record} onRefresh={load} />
               </div>
               <section
