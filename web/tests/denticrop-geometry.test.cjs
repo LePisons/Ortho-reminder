@@ -79,3 +79,10 @@ test('batch overlaps work, bounds concurrency, and continues after one failed it
  }),AggregateError);
  assert.equal(peak,3);assert.equal(active,0);assert.deepEqual(seen,[0,1,2,3,4,5]);
 });
+const {detectedPhotoView}=require('../src/lib/denticrop/photoView.ts');
+test('detector labels map to case views without guessing unknown classes',()=>{
+ for(const [label,view] of Object.entries({Extraoral_frontal:'EXTRAORAL_FRONT',Extraoral_sonrisa:'EXTRAORAL_SMILE',Extraoral_perfil:'EXTRAORAL_PROFILE',Intraoral_frontal:'INTRAORAL_FRONT',Intraoral_lateral_derecha:'INTRAORAL_RIGHT',Intraoral_lateral_izquierda:'INTRAORAL_LEFT',Intraoral_oclusal_superior:'OCCLUSAL_UPPER',Intraoral_oclusal_inferior:'OCCLUSAL_LOWER'}))assert.equal(detectedPhotoView(label),view);
+ assert.equal(detectedPhotoView('Intraoral oclusal superior'),'OCCLUSAL_UPPER');
+ assert.equal(detectedPhotoView('intraoral_lateral'),undefined);
+ assert.equal(detectedPhotoView(),undefined);
+});

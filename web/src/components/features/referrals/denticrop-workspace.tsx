@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { detectedPhotoView } from "@/lib/denticrop/photoView";
 import { runBatch } from "@/lib/denticrop/batch";
 import { Crop, WandSparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ type Row = {
   view: string;
   error?: string;
   processing?: boolean;
+  viewEdited?: boolean;
 };
 
 export function DenticropWorkspace({
@@ -204,6 +206,10 @@ export function DenticropWorkspace({
                 ? {
                     ...r,
                     image,
+                    view:
+                      !r.viewEdited && r.view === "UNASSIGNED"
+                        ? detectedPhotoView(image.className) || r.view
+                        : r.view,
                     processing: false,
                     reviewed: false,
                     error: image.error,
@@ -230,7 +236,7 @@ export function DenticropWorkspace({
         }
       });
       setMessage(
-        "Lote terminado. Si alguna foto falló, puedes reintentar o recortar manualmente. Propuestas preparadas. Abre cada imagen para revisar el encuadre y la orientación antes de guardarla.",
+        "Lote terminado. Revisa los encuadres y confirma las seleccionadas para guardarlas. Abre el editor solo si necesitas ajustar una foto.",
       );
     } finally {
       setBusy(false);
@@ -426,7 +432,8 @@ export function DenticropWorkspace({
             Cola de procesamiento ({rows.length})
           </h3>
           <p className="text-sm text-muted-foreground">
-            Haz clic en una foto para abrir el editor y confirmar su revisión.
+            Haz clic en una foto si necesitas ajustar el encuadre o la
+            orientación.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {rows.map((row) => (
@@ -497,6 +504,15 @@ export function DenticropWorkspace({
                     {row.error}
                   </p>
                 )}
+                {row.image?.className && (
+                  <p className="px-3 text-xs text-muted-foreground">
+                    Detectado:{" "}
+                    {photoViews[detectedPhotoView(row.image.className) || ""] ||
+                      row.image.className}
+                    {!detectedPhotoView(row.image.className) &&
+                      " · elige la vista"}
+                  </p>
+                )}
                 <label className="block px-3 text-xs">
                   Vista de la fotografía
                   <select
@@ -507,7 +523,7 @@ export function DenticropWorkspace({
                       setRows((current) =>
                         current.map((r) =>
                           r.photo.id === row.photo.id
-                            ? { ...r, view: e.target.value }
+                            ? { ...r, view: e.target.value, viewEdited: true }
                             : r,
                         ),
                       )
@@ -531,17 +547,64 @@ export function DenticropWorkspace({
               </article>
             ))}
           </div>
-          <Button
-            className={`${primaryAction} h-auto min-h-10 whitespace-normal`}
-            disabled={
-              busy || !rows.some((r) => r.selected && r.reviewed && !r.saved)
-            }
-            onClick={() => void save()}
-          >
-            {busy
-              ? "Procesando…"
-              : `Guardar seleccionados revisados (${rows.filter((r) => r.selected && r.reviewed && !r.saved).length})`}
-          </Button>
+          <div className="sticky -bottom-6 z-10 -mx-6 -mb-6 space-y-3 border-t bg-card p-4 shadow-[0_-4px_16px_#0000000a]">
+            <p className="text-sm text-muted-foreground">
+              Revisa los encuadres y las vistas en la cuadrícula. Puedes abrir
+              solo las fotos que necesiten ajustes.
+            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                disabled={
+                  busy ||
+                  !rows.some(
+                    (r) =>
+                      r.selected &&
+                      !r.saved &&
+                      !r.reviewed &&
+                      !r.error &&
+                      r.image?.resultBlob &&
+                      r.image.edit,
+                  )
+                }
+                onClick={() =>
+                  setRows((current) =>
+                    current.map((r) =>
+                      r.selected &&
+                      !r.saved &&
+                      !r.error &&
+                      r.image?.resultBlob &&
+                      r.image.edit
+                        ? { ...r, reviewed: true }
+                        : r,
+                    ),
+                  )
+                }
+              >
+                Confirmar revisión de las seleccionadas
+              </Button>
+              <Button
+                className={`${primaryAction} h-auto min-h-10 whitespace-normal`}
+                disabled={
+                  busy ||
+                  !rows.some((r) => r.selected && r.reviewed && !r.saved)
+                }
+                onClick={() => void save()}
+              >
+                {busy
+                  ? "Procesando…"
+                  : `Guardar recortes (${rows.filter((r) => r.selected && r.reviewed && !r.saved).length})`}
+              </Button>
+            </div>
+            {!busy &&
+              rows.some((r) => !r.saved) &&
+              !rows.some((r) => r.selected && r.reviewed && !r.saved) && (
+                <p role="status" className="text-xs text-muted-foreground">
+                  Para habilitar el guardado, selecciona fotos procesadas y
+                  confirma su revisión aquí o en el editor.
+                </p>
+              )}
+          </div>
         </DialogContent>
       </Dialog>
       <ImageEditor
