@@ -62,6 +62,16 @@ La migración agrega tablas y campos; no elimina datos. El script `start:prod` e
 
 ## Verificación local
 
+### Denticrop integrado (9 de octubre de 2026)
+
+- Fotografías → Preparar fotografías permite seleccionar originales, proponer recortes por lote, revisar encuadre/rotación/espejo, elegir la vista y guardar solo los seleccionados y revisados. También permite recortar manualmente sin proveedor externo.
+- Cada recorte se guarda como un nuevo archivo privado vinculado al original mediante `sourceFileId`, con su receta de edición. Los originales se conservan y siguen descargables. Originales y recortes cuentan dentro del límite existente de 60 archivos por caso.
+- El núcleo de geometría y editor se adaptó de Denticrop; su aplicación independiente no se modifica. Esta primera integración no incluye su modelo ONNX de orientación automática ni su sistema de cuentas/facturación. La orientación se revisa en el editor y la vista se elige manualmente.
+- Para propuestas automáticas se requieren las variables de servidor `DENTICROP_ENABLED=true`, `DENTICROP_ROBOFLOW_API_KEY` y `DENTICROP_ROBOFLOW_MODEL_ID` (modelo/versión). La clave nunca llega al navegador. Desactivar la primera variable conserva el editor manual.
+- Cada lote requiere consentimiento explícito: solo se envía a Roboflow una vista previa JPEG de 640×640 generada en el navegador, sin nombre de archivo ni datos de la ficha. La fotografía puede identificar al paciente. El resultado de alta resolución se produce localmente en el navegador; guardar lo envía al almacenamiento privado de Orthoreminder.
+- Las rutas comprueban rol, acceso al caso, original del mismo caso, revocación, formato/tamaño y límites de frecuencia. El consentimiento queda auditado sin guardar contenido de imágenes. Guardar un recorte por un colega usa el evento existente de carga para los avisos al propietario.
+- Migración aditiva `20261008020000_referral_photo_crops` comprobada sobre la copia privada restaurada. Pruebas de permisos/validación/limpieza de archivos y geometría, revisión en navegador con datos sintéticos, editor manual y propuesta automática simulada. Conexión real con Roboflow comprobada únicamente con una imagen sintética; no valida precisión clínica del detector.
+
 ### Aprobación, checklist y seguimiento (8 de octubre de 2026)
 
 - La aceptación de la derivación inicia planificación. El administrador comparte una versión de setup y el caso pasa a revisión del colega. Solo el derivador asignado puede aprobar o pedir cambios en la última versión pendiente; los cambios requieren observaciones. Cada decisión es inmutable y conserva autor, fecha y versión. Una versión nueva exige nueva aprobación.

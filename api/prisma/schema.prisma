@@ -347,8 +347,13 @@ model ReferralFile {
   contentType String
   size Int
   uploadedBy String
+  sourceFileId String?
+  sourceFile ReferralFile? @relation("PhotoCrops", fields: [sourceFileId], references: [id], onDelete: Restrict)
+  crops ReferralFile[] @relation("PhotoCrops")
+  editRecipe Json?
   createdAt DateTime @default(now())
   @@index([referralId])
+  @@index([sourceFileId])
 }
 
 model ReferralNotificationEvent {

@@ -193,6 +193,8 @@ export interface ReferralDetail extends ReferralInput {
     photoView?: string;
     size: number;
     uploadedBy: string;
+    sourceFileId?: string | null;
+    editRecipe?: import('@/lib/denticrop/types').ImageEdit | null;
     createdAt: string;
   }[];
   comments: {

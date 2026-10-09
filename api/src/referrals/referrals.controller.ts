@@ -35,6 +35,8 @@ import {
   PhotoViewDto,
   SetupDecisionDto,
   ReferralStageDto,
+  CropUploadDto,
+  CropProposalDto,
 } from './referrals.dto';
 
 @Controller('referrals')
@@ -226,6 +228,62 @@ export class ReferralsController {
     @Request() req,
   ) {
     return this.referrals.classifyPhoto(id, fileId, dto.photoView, req.user);
+  }
+
+  @Get(':id/crop-config')
+  async cropConfig(
+    @Param('id') id: string,
+    @Request() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.setHeader('Cache-Control', 'no-store');
+    await this.referrals.access(id, req.user);
+    return this.referrals.cropConfig();
+  }
+
+  @Post(':id/files/:fileId/crop-proposal')
+  @UseGuards(ReferralUploadGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 512 * 1024, files: 1, fields: 1 },
+    }),
+  )
+  proposeCrop(
+    @Param('id') id: string,
+    @Param('fileId') fileId: string,
+    @Body() dto: CropProposalDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    return this.referrals.cropProposal(id, fileId, dto.consent, file, req.user);
+  }
+
+  @Post(':id/files/:fileId/crops')
+  @UseGuards(ReferralUploadGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 60 * 1024 * 1024, files: 1, fields: 2 },
+    }),
+  )
+  saveCrop(
+    @Param('id') id: string,
+    @Param('fileId') fileId: string,
+    @Body() dto: CropUploadDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    return this.referrals.saveCrop(
+      id,
+      fileId,
+      dto.recipe,
+      dto.photoView,
+      file,
+      req.user,
+    );
   }
 
   @Get(':id/files/:fileId')

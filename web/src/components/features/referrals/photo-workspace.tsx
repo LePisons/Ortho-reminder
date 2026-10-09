@@ -13,6 +13,7 @@ import {
   ReferralDetail,
   referralRequest,
 } from "@/lib/api/referrals.api";
+import { DenticropWorkspace } from "./denticrop-workspace";
 import { API_URL } from "@/lib/utils";
 import {
   panel,
@@ -228,6 +229,7 @@ export function PhotoWorkspace({
           sin clasificar
         </span>
       </div>
+      <DenticropWorkspace record={record} onRefresh={onRefresh} />
       <Dialog
         open={open}
         onOpenChange={(next) => {
@@ -423,7 +425,8 @@ export function PhotoWorkspace({
                         )}
                         {group.length > 1 && (
                           <p className="mt-2 text-xs text-foreground/65">
-                            {group.length} originales; se muestra el último.
+                            {group.length} archivos, incluidos recortes; se
+                            muestra el último.
                           </p>
                         )}
                       </div>
@@ -433,7 +436,7 @@ export function PhotoWorkspace({
             </div>
             <section className="space-y-3">
               <h3 className="font-semibold">
-                Todos los originales ({photos.length})
+                Originales y recortes ({photos.length})
               </h3>
               {photos.length === 0 && (
                 <p className="text-sm text-foreground/65">
@@ -459,6 +462,19 @@ export function PhotoWorkspace({
                         <ZoomIn size={17} />
                       </Button>
                     </div>
+                    <p className="text-xs font-semibold text-primary">
+                      {photo.sourceFileId
+                        ? "Recorte revisado · original conservado"
+                        : "Fotografía original"}
+                    </p>
+                    {photo.sourceFileId && (
+                      <a
+                        className="text-xs underline"
+                        href={`${API_URL}/referrals/${record.id}/files/${photo.sourceFileId}`}
+                      >
+                        Descargar original de este recorte
+                      </a>
+                    )}
                     <select
                       disabled={!active || busy}
                       aria-label={`Clasificar ${photo.name}`}
@@ -476,7 +492,9 @@ export function PhotoWorkspace({
                       className="text-sm font-medium text-primary underline underline-offset-4"
                       href={fileUrl(photo)}
                     >
-                      Descargar original
+                      {photo.sourceFileId
+                        ? "Descargar recorte"
+                        : "Descargar original"}
                     </a>
                   </div>
                 ))}

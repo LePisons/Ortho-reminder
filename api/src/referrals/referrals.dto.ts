@@ -105,3 +105,10 @@ export class UploadReferralFileDto {
 export class PhotoViewDto {
   @IsIn(PHOTO_VIEWS) photoView: string;
 }
+export class CropUploadDto {
+  @IsString() @MaxLength(2000) recipe: string;
+  @IsIn(PHOTO_VIEWS) photoView: string;
+}
+export class CropProposalDto {
+  @IsIn(['true']) consent: string;
+}

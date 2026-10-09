@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Prisma, ReferralStatus } from '@prisma/client';
 import { randomBytes, randomUUID } from 'crypto';
@@ -16,6 +17,7 @@ import {
 } from '../storage/image-validation';
 import { isValidStl } from '../storage/stl-validation';
 import { referralChecklist } from './referral-checklist';
+import { safePredictions, validateCropRecipe } from './crop-validation';
 import {
   AcceptReferralDto,
   CreateColleagueDto,
@@ -46,6 +48,8 @@ const fileSelect = {
   size: true,
   uploadedBy: true,
   createdAt: true,
+  sourceFileId: true,
+  editRecipe: true,
 } as const;
 const normalizeRut = (value: string) =>
   value.replace(/[.\s-]/g, '').toUpperCase();
@@ -711,6 +715,7 @@ export class ReferralsService {
     file: Express.Multer.File,
     actor: ReferralActor,
     photoView = 'UNASSIGNED',
+    crop?: { sourceFileId: string; editRecipe: Prisma.InputJsonObject },
   ) {
     await this.access(id, actor);
     if (!file) throw new BadRequestException('Selecciona un archivo.');
@@ -739,7 +744,7 @@ export class ReferralsService {
       return await this.prisma.$transaction(async (tx) => {
         // Lock the case and recheck access after upload; revocation wins before publication.
         const changed = await tx.referral.updateMany({
-          where: { id, ...this.scope(actor) },
+          where: { id, ...this.scope(actor), ...(crop ? {revokedAt:null} : {}) },
           data: { updatedAt: new Date() },
         });
         if (!changed.count)
@@ -753,6 +758,7 @@ export class ReferralsService {
           );
         const asset = await tx.referralFile.create({
           data: {
+            ...(crop || {}),
             referralId: id,
             key,
             kind,
@@ -773,6 +779,108 @@ export class ReferralsService {
       await this.r2.deleteObject(key).catch(() => undefined);
       throw error;
     }
+  }
+
+  cropConfig() {
+    return {
+      available:
+        process.env.DENTICROP_ENABLED === 'true' &&
+        !!process.env.DENTICROP_ROBOFLOW_API_KEY &&
+        /^[a-z0-9_-]+\/\d+$/i.test(
+          process.env.DENTICROP_ROBOFLOW_MODEL_ID || '',
+        ),
+    };
+  }
+
+  private async originalPhoto(
+    id: string,
+    fileId: string,
+    actor: ReferralActor,
+  ) {
+    const record = await this.access(id, actor);
+    if (record.revokedAt)
+      throw new NotFoundException('Derivación no disponible.');
+    const file = await this.prisma.referralFile.findFirst({
+      where: { id: fileId, referralId: id, kind: 'PHOTO', sourceFileId: null },
+    });
+    if (!file)
+      throw new NotFoundException('Fotografía original no disponible.');
+    return file;
+  }
+
+  async saveCrop(
+    id: string,
+    fileId: string,
+    recipe: string,
+    photoView: string,
+    file: Express.Multer.File,
+    actor: ReferralActor,
+  ) {
+    await this.originalPhoto(id, fileId, actor);
+    const editRecipe = validateCropRecipe(recipe);
+    return this.upload(id, 'PHOTO', file, actor, photoView, {
+      sourceFileId: fileId,
+      editRecipe,
+    });
+  }
+
+  async cropProposal(
+    id: string,
+    fileId: string,
+    consent: string,
+    file: Express.Multer.File,
+    actor: ReferralActor,
+  ) {
+    await this.originalPhoto(id, fileId, actor);
+    if (consent !== 'true')
+      throw new BadRequestException('Confirma el procesamiento con Roboflow.');
+    if (
+      !file ||
+      file.size > 512 * 1024 ||
+      detectImageContentType(file.buffer) !== 'image/jpeg'
+    )
+      throw new BadRequestException(
+        'Se requiere una vista previa JPEG reducida.',
+      );
+    if (!this.cropConfig().available)
+      throw new ServiceUnavailableException(
+        'La propuesta automática aún no está configurada. Puedes usar el editor manual.',
+      );
+    await this.audit(this.prisma, actor, 'CROP_PROCESSING_CONSENT', id, {
+      fileId,
+      provider: 'Roboflow',
+    });
+    let response: globalThis.Response;
+    try {
+      response = await fetch(
+        `https://detect.roboflow.com/${process.env.DENTICROP_ROBOFLOW_MODEL_ID}?api_key=${encodeURIComponent(process.env.DENTICROP_ROBOFLOW_API_KEY!)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: file.buffer.toString('base64'),
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+    } catch {
+      throw new ServiceUnavailableException(
+        'No se pudo obtener la propuesta. Intenta nuevamente o recorta manualmente.',
+      );
+    }
+    if (!response.ok)
+      throw new ServiceUnavailableException(
+        'El servicio de recorte no está disponible. Usa el editor manual o inténtalo más tarde.',
+      );
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      throw new ServiceUnavailableException('Respuesta de detección inválida.');
+    }
+    await this.originalPhoto(id, fileId, actor);
+    return {
+      predictions: safePredictions(data),
+      image: { width: 640, height: 640 },
+    };
   }
 
   async classifyPhoto(

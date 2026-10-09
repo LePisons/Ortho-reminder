@@ -106,6 +106,29 @@ describe('External referral HTTP boundaries', () => {
   it('denies an external user an unmarked internal route', async () => {
     await request(app.getHttpServer()).get('/internal').expect(403);
   });
+  it.each(['crop-proposal', 'crops'])(
+    'blocks foreign and revoked crop uploads before processing: %s',
+    async (action) => {
+      for (const id of ['b', 'revoked']) {
+        await request(app.getHttpServer())
+          .post(`/referrals/${id}/files/original/${action}`)
+          .field('consent', 'true')
+          .attach('file', Buffer.from('not-an-image'), 'preview.jpg')
+          .expect(404);
+      }
+      expect(r2.putObject).not.toHaveBeenCalled();
+    },
+  );
+  it('keeps crop configuration scoped and uncached', async () => {
+    await request(app.getHttpServer())
+      .get('/referrals/b/crop-config')
+      .expect(404);
+    const response = await request(app.getHttpServer())
+      .get('/referrals/a/crop-config')
+      .expect(200);
+    expect(Object.keys(response.body)).toEqual(['available']);
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
   it('blocks case access until the initial password has been changed', async () => {
     await request(app.getHttpServer())
       .get('/referrals')
@@ -208,16 +231,33 @@ describe('External referral HTTP boundaries', () => {
       .send({ title: 'Setup', url: 'javascript:alert(1)' })
       .expect(400);
   });
-  it.each(['b', 'revoked'])('blocks decisions on inaccessible case %s', async id => {
-    await request(app.getHttpServer()).post(`/referrals/${id}/setups/setup/decision`).send({decision:'APPROVED'}).expect(404);
-  });
+  it.each(['b', 'revoked'])(
+    'blocks decisions on inaccessible case %s',
+    async (id) => {
+      await request(app.getHttpServer())
+        .post(`/referrals/${id}/setups/setup/decision`)
+        .send({ decision: 'APPROVED' })
+        .expect(404);
+    },
+  );
   it('does not let a colleague change workflow stages', async () => {
-    await request(app.getHttpServer()).patch('/referrals/a/stage').send({stage:'DELIVERED',expectedStage:'MANUFACTURING'}).expect(403);
+    await request(app.getHttpServer())
+      .patch('/referrals/a/stage')
+      .send({ stage: 'DELIVERED', expectedStage: 'MANUFACTURING' })
+      .expect(403);
   });
   it('does not let an administrator impersonate a setup approval', async () => {
-    await request(app.getHttpServer()).post('/referrals/a/setups/setup/decision').set('x-test-role','ADMIN').set('x-test-user','admin-a').send({decision:'APPROVED'}).expect(403);
+    await request(app.getHttpServer())
+      .post('/referrals/a/setups/setup/decision')
+      .set('x-test-role', 'ADMIN')
+      .set('x-test-user', 'admin-a')
+      .send({ decision: 'APPROVED' })
+      .expect(403);
   });
   it('validates decisions before any mutation', async () => {
-    await request(app.getHttpServer()).post('/referrals/a/setups/setup/decision').send({decision:'ANYTHING'}).expect(400);
+    await request(app.getHttpServer())
+      .post('/referrals/a/setups/setup/decision')
+      .send({ decision: 'ANYTHING' })
+      .expect(400);
   });
 });
