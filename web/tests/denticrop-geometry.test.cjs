@@ -69,3 +69,13 @@ test('a feasible standard ratio expands the crop without losing detection edges'
   assert.ok(result.x + result.width >= box.x + box.width);
   assert.ok(result.y + result.height >= box.y + box.height);
 });
+const {runBatch}=require('../src/lib/denticrop/batch.ts');
+test('batch overlaps work, bounds concurrency, and continues after one failed item',async()=>{
+ let active=0, peak=0;const seen=[];
+ await assert.rejects(runBatch([0,1,2,3,4,5],3,async n=>{
+   active++;peak=Math.max(peak,active);seen.push(n);
+   await new Promise(resolve=>setTimeout(resolve,5));active--;
+   if(n===1)throw Error('test failure');
+ }),AggregateError);
+ assert.equal(peak,3);assert.equal(active,0);assert.deepEqual(seen,[0,1,2,3,4,5]);
+});

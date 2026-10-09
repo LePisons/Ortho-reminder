@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Crop, WandSparkles } from "lucide-react";
+import { runBatch } from "@/lib/denticrop/batch";
+import { Crop, WandSparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,14 +33,17 @@ type Row = {
   saved?: boolean;
   view: string;
   error?: string;
+  processing?: boolean;
 };
 
 export function DenticropWorkspace({
   record,
   onRefresh,
+  localFiles,
 }: {
   record: ReferralDetail;
   onRefresh: () => Promise<void>;
+  localFiles: Map<string, File>;
 }) {
   const [open, setOpen] = useState(false),
     [rows, setRows] = useState<Row[]>([]),
@@ -48,16 +52,23 @@ export function DenticropWorkspace({
     [consent, setConsent] = useState(false),
     [available, setAvailable] = useState(false),
     [message, setMessage] = useState("");
+  const loads = useRef(new Map<string, Promise<DentalImage>>());
+  const generation = useRef(0);
   const urls = useRef(new Set<string>());
   useEffect(() => {
     const owned = urls.current;
-    return () => owned.forEach((url) => URL.revokeObjectURL(url));
+    return () => {
+      generation.current++;
+      owned.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, []);
   function own(url: string) {
     urls.current.add(url);
     return url;
   }
   function release() {
+    generation.current++;
+    loads.current.clear();
     urls.current.forEach((url) => URL.revokeObjectURL(url));
     urls.current.clear();
     setRows([]);
@@ -73,16 +84,40 @@ export function DenticropWorkspace({
         .filter((photo) => photo.kind === "PHOTO" && !photo.sourceFileId)
         .map((photo) => ({
           photo,
-          selected: false,
+          selected: true,
           view: photo.photoView || "UNASSIGNED",
         })),
     );
     setOpen(true);
+    const currentGeneration = generation.current;
+    void runBatch(
+      record.files.filter((p) => p.kind === "PHOTO" && !p.sourceFileId),
+      3,
+      async (photo) => {
+        if (generation.current !== currentGeneration) return;
+        try {
+          const image = await load({
+            photo,
+            selected: true,
+            view: photo.photoView || "UNASSIGNED",
+          });
+          if (generation.current === currentGeneration)
+            setRows((rows) =>
+              rows.map((r) =>
+                r.photo.id === photo.id && !r.image ? { ...r, image } : r,
+              ),
+            );
+        } catch {
+          /* The row can retry loading when opened. */
+        }
+      },
+    );
     try {
       const config = await referralRequest<{ available: boolean }>(
         `/${record.id}/crop-config`,
       );
-      setAvailable(config.available);
+      if (generation.current === currentGeneration)
+        setAvailable(config.available);
     } catch {
       setMessage(
         "No se pudo consultar la propuesta automática. Puedes recortar manualmente.",
@@ -91,24 +126,41 @@ export function DenticropWorkspace({
   }
   async function load(row: Row): Promise<DentalImage> {
     if (row.image) return row.image;
-    const response = await fetch(
-      `${API_URL}/referrals/${record.id}/files/${row.photo.id}`,
-      { credentials: "include", cache: "no-store" },
-    );
-    if (!response.ok)
-      throw new Error("No se pudo cargar el original. Actualiza el caso.");
-    const blob = await response.blob();
-    const file = new File([blob], "original", { type: blob.type });
-    return {
-      id: row.photo.id,
-      batchId: record.id,
-      file,
-      editSource: file,
-      previewUrl: own(URL.createObjectURL(blob)),
-      status: "idle",
-      format: "image/jpeg",
-    };
+    const existing = loads.current.get(row.photo.id);
+    if (existing) return existing;
+    const version = generation.current;
+    const promise = (async () => {
+      let file = localFiles.get(row.photo.id);
+      if (!file) {
+        const response = await fetch(
+          `${API_URL}/referrals/${record.id}/files/${row.photo.id}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!response.ok)
+          throw new Error("No se pudo cargar el original. Actualiza el caso.");
+        const blob = await response.blob();
+        file = new File([blob], row.photo.name, { type: blob.type });
+      }
+      if (version !== generation.current) throw new Error("Ventana cerrada.");
+      return {
+        id: row.photo.id,
+        batchId: record.id,
+        file,
+        editSource: file,
+        previewUrl: own(URL.createObjectURL(file)),
+        status: "idle" as const,
+        format: "image/jpeg" as const,
+      };
+    })();
+    loads.current.set(row.photo.id, promise);
+    try {
+      return await promise;
+    } catch (error) {
+      loads.current.delete(row.photo.id);
+      throw error;
+    }
   }
+
   async function edit(row: Row) {
     setBusy(true);
     setMessage("");
@@ -130,8 +182,15 @@ export function DenticropWorkspace({
     const selected = rows.filter((row) => row.selected && !row.saved);
     try {
       const { proposeCrop } = await import("@/lib/denticrop/proposeCrop");
-      for (const [index, row] of selected.entries()) {
-        setMessage(`Preparando ${index + 1} de ${selected.length}…`);
+      let completed = 0;
+      await runBatch(selected, 3, async (row) => {
+        setRows((rows) =>
+          rows.map((r) =>
+            r.photo.id === row.photo.id
+              ? { ...r, processing: true, error: undefined }
+              : r,
+          ),
+        );
         try {
           const source = await load(row);
           const image = await proposeCrop(
@@ -142,7 +201,13 @@ export function DenticropWorkspace({
           setRows((current) =>
             current.map((r) =>
               r.photo.id === row.photo.id
-                ? { ...r, image, reviewed: false, error: image.error }
+                ? {
+                    ...r,
+                    image,
+                    processing: false,
+                    reviewed: false,
+                    error: image.error,
+                  }
                 : r,
             ),
           );
@@ -152,16 +217,20 @@ export function DenticropWorkspace({
               r.photo.id === row.photo.id
                 ? {
                     ...r,
+                    processing: false,
                     error:
                       e instanceof Error ? e.message : "No se pudo preparar.",
                   }
                 : r,
             ),
           );
+        } finally {
+          completed++;
+          setMessage(`${completed} de ${selected.length} fotos procesadas`);
         }
-      }
+      });
       setMessage(
-        "Propuestas preparadas. Abre cada imagen para revisar el encuadre y la orientación antes de guardarla.",
+        "Lote terminado. Si alguna foto falló, puedes reintentar o recortar manualmente. Propuestas preparadas. Abre cada imagen para revisar el encuadre y la orientación antes de guardarla.",
       );
     } finally {
       setBusy(false);
@@ -291,7 +360,7 @@ export function DenticropWorkspace({
           }
         }}
       >
-        <DialogContent className="min-w-0 sm:max-w-5xl">
+        <DialogContent className="min-w-0 sm:max-w-6xl">
           <DialogTitle>Preparar fotografías con Denticrop</DialogTitle>
           <DialogDescription>
             Selecciona originales, revisa cada propuesta y guarda los recortes
@@ -353,20 +422,52 @@ export function DenticropWorkspace({
               {message}
             </p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <h3 className="text-lg font-semibold">
+            Cola de procesamiento ({rows.length})
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Haz clic en una foto para abrir el editor y confirmar su revisión.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {rows.map((row) => (
               <article
                 key={row.photo.id}
-                className="space-y-3 rounded-xl border bg-card p-4"
+                className="min-w-0 space-y-3 overflow-hidden rounded-2xl border bg-card pb-3 shadow-sm"
               >
-                <label className="flex items-start gap-2 text-sm font-semibold">
+                <button
+                  type="button"
+                  aria-label={`Editar ${row.photo.name}`}
+                  disabled={busy || row.saved}
+                  onClick={() => void edit(row)}
+                  className="relative flex aspect-square w-full items-center justify-center bg-[#1B1B1B] focus-visible:outline-2 focus-visible:outline-[#6469FC]"
+                >
+                  {row.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={row.image.resultUrl || row.image.previewUrl}
+                      alt={row.photo.name}
+                      className={`h-full w-full object-contain ${row.processing ? "opacity-50" : ""}`}
+                    />
+                  ) : (
+                    <span className="text-xs text-white/80">
+                      Cargando vista previa…
+                    </span>
+                  )}
+                  {row.processing && (
+                    <span className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-white">
+                      <Loader2 className="motion-safe:animate-spin" size={20} />
+                      Procesando
+                    </span>
+                  )}
+                </button>
+                <label className="flex items-center gap-2 px-3 text-xs font-medium">
                   <input
                     type="checkbox"
                     checked={row.selected}
                     disabled={busy || row.saved}
                     onChange={(e) =>
-                      setRows((current) =>
-                        current.map((r) =>
+                      setRows((rows) =>
+                        rows.map((r) =>
                           r.photo.id === row.photo.id
                             ? { ...r, selected: e.target.checked }
                             : r,
@@ -374,34 +475,29 @@ export function DenticropWorkspace({
                       )
                     }
                   />
-                  <span className="break-all">{row.photo.name}</span>
+                  <span className="truncate" title={row.photo.name}>
+                    {row.photo.name}
+                  </span>
                 </label>
-                {row.image ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */ <img
-                    src={row.image.resultUrl || row.image.previewUrl}
-                    alt="Recorte propuesto para revisar"
-                    className="h-36 w-full rounded-lg bg-muted object-contain"
-                  />
-                ) : (
-                  <div className="flex h-24 items-center justify-center rounded-lg bg-secondary/40 text-sm text-muted-foreground">
-                    Original disponible
-                  </div>
-                )}
-                <p className="text-xs font-semibold text-primary">
-                  {row.saved
-                    ? "Guardado"
-                    : row.reviewed
-                      ? "Revisado · listo para guardar"
-                      : row.image?.resultBlob
-                        ? "Propuesta · requiere revisión"
-                        : "Sin preparar"}
+                <p className="mx-3 w-fit rounded-full bg-[#6469FC]/10 px-2 py-1 text-xs font-semibold text-primary">
+                  {row.processing
+                    ? "Procesando…"
+                    : row.error
+                      ? "Necesita atención"
+                      : row.saved
+                        ? "Guardado"
+                        : row.reviewed
+                          ? "Revisado · listo para guardar"
+                          : row.image?.resultBlob
+                            ? "Propuesta · requiere revisión"
+                            : "Sin preparar"}
                 </p>
                 {row.error && (
                   <p role="alert" className="text-xs text-red-700">
                     {row.error}
                   </p>
                 )}
-                <label className="block text-xs">
+                <label className="block px-3 text-xs">
                   Vista de la fotografía
                   <select
                     className="mt-1 block w-full rounded-lg border bg-card p-2 text-sm"
@@ -426,7 +522,7 @@ export function DenticropWorkspace({
                 </label>
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="mx-3 w-[calc(100%-1.5rem)]"
                   disabled={busy || row.saved}
                   onClick={() => void edit(row)}
                 >

@@ -13,6 +13,7 @@ import {
   ReferralDetail,
   referralRequest,
 } from "@/lib/api/referrals.api";
+import { runBatch } from "@/lib/denticrop/batch";
 import { DenticropWorkspace } from "./denticrop-workspace";
 import { API_URL } from "@/lib/utils";
 import {
@@ -29,6 +30,7 @@ type Pending = {
   view: string;
   preview: string;
   error?: string;
+  uploading?: boolean;
 };
 
 function PrivatePhoto({
@@ -99,6 +101,7 @@ export function PhotoWorkspace({
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Photo | null>(null);
+  const localFiles = useRef(new Map<string, File>());
   const picker = useRef<HTMLInputElement>(null);
   const objectUrls = useRef(new Set<string>());
   useEffect(() => {
@@ -149,24 +152,39 @@ export function PhotoWorkspace({
     setError("");
     let completed = 0;
     const failed: Pending[] = [];
-    for (const [index, item] of pending.entries()) {
-      setProgress(`Subiendo ${index + 1} de ${pending.length}…`);
+    let finished = 0;
+    await runBatch(pending, 2, async (item) => {
+      setPending((rows) =>
+        rows.map((r) =>
+          r.id === item.id ? { ...r, uploading: true, error: undefined } : r,
+        ),
+      );
       try {
         const data = new FormData();
         data.append("kind", "PHOTO");
         data.append("photoView", item.view);
         data.append("file", item.file);
-        await referralRequest(`/${record.id}/files`, "POST", data);
+        const asset = await referralRequest<Photo>(
+          `/${record.id}/files`,
+          "POST",
+          data,
+        );
+        localFiles.current.set(asset.id, item.file);
         completed++;
+        setPending((rows) => rows.filter((row) => row.id !== item.id));
         URL.revokeObjectURL(item.preview);
         objectUrls.current.delete(item.preview);
       } catch (e) {
         failed.push({
           ...item,
+          uploading: false,
           error: e instanceof Error ? e.message : "No se pudo subir.",
         });
+      } finally {
+        finished++;
+        setProgress(`${finished} de ${pending.length} fotos completadas`);
       }
-    }
+    });
     setPending(failed);
     setProgress(
       `${completed} fotografía${completed === 1 ? "" : "s"} guardada${completed === 1 ? "" : "s"}.`,
@@ -177,6 +195,10 @@ export function PhotoWorkspace({
       );
     try {
       await onRefresh();
+    } catch {
+      setError(
+        "Las fotos guardadas se conservan. Actualiza el caso para verlas en la galería.",
+      );
     } finally {
       setBusy(false);
     }
@@ -229,7 +251,11 @@ export function PhotoWorkspace({
           sin clasificar
         </span>
       </div>
-      <DenticropWorkspace record={record} onRefresh={onRefresh} />
+      <DenticropWorkspace
+        record={record}
+        onRefresh={onRefresh}
+        localFiles={localFiles.current}
+      />
       <Dialog
         open={open}
         onOpenChange={(next) => {
@@ -312,21 +338,28 @@ export function PhotoWorkspace({
             {pending.length > 0 && (
               <section className="space-y-3 rounded-xl border bg-card p-4">
                 <h3 className="font-semibold">Por subir ({pending.length})</h3>
-                <div className="max-h-72 space-y-3 overflow-y-auto">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {pending.map((item) => (
                     <div
                       key={item.id}
-                      className="flex flex-wrap items-center gap-3 border-b pb-3"
+                      className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border bg-card p-3"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.preview}
                         alt="Vista previa del archivo seleccionado"
-                        className="h-14 w-16 rounded-lg object-cover"
+                        className="aspect-square w-full rounded-lg bg-[#1B1B1B] object-contain"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="break-all text-sm font-medium">
                           {item.file.name}
+                        </p>
+                        <p className="text-xs text-primary">
+                          {item.uploading
+                            ? "Subiendo…"
+                            : item.error
+                              ? "No se pudo subir"
+                              : "En espera"}
                         </p>
                         {item.error && (
                           <p className="text-xs text-red-700">{item.error}</p>
