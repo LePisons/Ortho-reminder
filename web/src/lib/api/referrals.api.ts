@@ -69,6 +69,7 @@ export const fileKinds: Record<string, string> = {
   XRAY: "Radiografía (imagen)",
 };
 export interface ReferralSummary {
+  files?: { id: string }[];
   stage: string;
   id: string;
   fullName: string;

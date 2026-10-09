@@ -212,6 +212,16 @@ export class ReferralsService {
         createdAt: true,
         updatedAt: true,
         referrer: { select: personSelect },
+        files: {
+          where: {
+            kind: 'PHOTO',
+            photoView: 'EXTRAORAL_SMILE',
+            removedAt: null,
+          },
+          select: { id: true },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+        },
         _count: {
           select: { files: { where: { removedAt: null } }, comments: true },
         },

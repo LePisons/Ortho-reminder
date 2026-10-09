@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { API_URL } from "@/lib/utils";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +17,23 @@ import {
 } from "@/lib/api/referrals.api";
 import { primaryAction } from "@/components/features/referrals/referral-ui";
 import { Plus, ArrowUpRight, Users, FolderOpen } from "lucide-react";
+
+function SmilePhoto({ caseId, fileId }: { caseId: string; fileId: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  // Same-origin authenticated route; clinical images never use a public image proxy.
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={`${API_URL}/referrals/${caseId}/files/${fileId}`}
+      alt="Frontal sonriendo"
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="h-14 w-14 shrink-0 rounded-xl border border-[#6469FC]/20 bg-secondary object-cover"
+    />
+  );
+}
 
 export default function ReferralsPage() {
   const { user } = useAuth();
@@ -334,7 +352,18 @@ export default function ReferralsPage() {
                     className="flex flex-wrap items-center justify-between gap-4 p-5 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-[#6469FC]"
                   >
                     <div className="min-w-0">
-                      <h2 className="font-semibold">{c.fullName}</h2>
+                      <div className="flex items-center gap-3">
+                        {c.files?.[0] && (
+                          <SmilePhoto
+                            key={c.files[0].id}
+                            caseId={c.id}
+                            fileId={c.files[0].id}
+                          />
+                        )}
+                        <h2 className="min-w-0 break-words font-semibold">
+                          {c.fullName}
+                        </h2>
+                      </div>
                       {!c.revokedAt && (
                         <p className="mt-1 max-w-xl text-sm text-foreground/80">
                           {referralNextStep[c.stage]}
