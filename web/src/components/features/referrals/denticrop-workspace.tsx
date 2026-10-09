@@ -284,6 +284,7 @@ export function DenticropWorkspace({
             "POST",
             form,
           );
+          localFiles.delete(row.photo.id);
           saved++;
           setRows((current) =>
             current.map((r) =>
@@ -311,12 +312,12 @@ export function DenticropWorkspace({
         await onRefresh();
       } catch {
         setMessage(
-          `${saved} recortes guardados. No se pudo actualizar la galería; cierra esta ventana y actualiza el caso. Los originales se conservan.`,
+          `${saved} recortes guardados. No se pudo actualizar la galería; cierra esta ventana y actualiza el caso. Los originales de los recortes guardados se retiran del caso.`,
         );
         return;
       }
       setMessage(
-        `${saved} ${saved === 1 ? "recorte guardado" : "recortes guardados"}.${failed ? " Algunos no se guardaron; revisa los errores y reintenta." : ""} Los originales se conservan.`,
+        `${saved} ${saved === 1 ? "recorte guardado" : "recortes guardados"}.${failed ? " Algunos no se guardaron; revisa los errores y reintenta." : ""} Los originales de los recortes guardados se retiran del caso.`,
       );
     } finally {
       setBusy(false);
@@ -331,8 +332,8 @@ export function DenticropWorkspace({
         <div>
           <h3 className="font-semibold">Denticrop · Recortes revisables</h3>
           <p className="mt-1 text-sm text-foreground/70">
-            Prepara las fotos, ajusta el encuadre y guarda una versión sin
-            reemplazar el original.
+            Prepara las fotos, ajusta el encuadre y guarda la versión revisada.
+            Su original se eliminará del caso después de guardar.
           </p>
         </div>
         <Button
@@ -370,7 +371,8 @@ export function DenticropWorkspace({
           <DialogTitle>Preparar fotografías con Denticrop</DialogTitle>
           <DialogDescription>
             Selecciona originales, revisa cada propuesta y guarda los recortes
-            elegidos. Los archivos del caso solo cambian al guardar.
+            elegidos. Al guardar se elimina el original correspondiente; si el
+            guardado falla, el original se conserva.
           </DialogDescription>
           <div className="space-y-3 rounded-xl border bg-secondary/30 p-4">
             {available ? (

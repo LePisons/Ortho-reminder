@@ -49,6 +49,7 @@ const fileSelect = {
   uploadedBy: true,
   createdAt: true,
   sourceFileId: true,
+  sourceFile: { select: { removedAt: true } },
   editRecipe: true,
 } as const;
 const normalizeRut = (value: string) =>
@@ -211,7 +212,9 @@ export class ReferralsService {
         createdAt: true,
         updatedAt: true,
         referrer: { select: personSelect },
-        _count: { select: { files: true, comments: true } },
+        _count: {
+          select: { files: { where: { removedAt: null } }, comments: true },
+        },
       },
       orderBy: { updatedAt: 'desc' },
       take: 200,
@@ -242,7 +245,11 @@ export class ReferralsService {
       where: { id, ...this.scope(actor) },
       include: {
         referrer: { select: personSelect },
-        files: { select: fileSelect, orderBy: { createdAt: 'asc' } },
+        files: {
+          where: { removedAt: null },
+          select: fileSelect,
+          orderBy: { createdAt: 'asc' },
+        },
         comments: { orderBy: { createdAt: 'asc' } },
         setups: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
         timeline: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
@@ -327,7 +334,7 @@ export class ReferralsService {
       throw new ConflictException('Esta derivación no puede enviarse.');
     return this.prisma.$transaction(async (tx) => {
       const files = await tx.referralFile.findMany({
-        where: { referralId: id },
+        where: { referralId: id, removedAt: null },
         select: { kind: true },
       });
       if (
@@ -744,13 +751,36 @@ export class ReferralsService {
       return await this.prisma.$transaction(async (tx) => {
         // Lock the case and recheck access after upload; revocation wins before publication.
         const changed = await tx.referral.updateMany({
-          where: { id, ...this.scope(actor), ...(crop ? {revokedAt:null} : {}) },
+          where: {
+            id,
+            ...this.scope(actor),
+            ...(crop ? { revokedAt: null } : {}),
+          },
           data: { updatedAt: new Date() },
         });
         if (!changed.count)
           throw new NotFoundException('Derivación no disponible.');
+        if (crop) {
+          const removed = await tx.referralFile.updateMany({
+            where: {
+              id: crop.sourceFileId,
+              referralId: id,
+              kind: 'PHOTO',
+              sourceFileId: null,
+              removedAt: null,
+            },
+            data: { removedAt: new Date() },
+          });
+          if (!removed.count)
+            throw new ConflictException(
+              'El original ya fue reemplazado. Actualiza el caso.',
+            );
+          await this.audit(tx, actor, 'ORIGINAL_REPLACED', id, {
+            fileId: crop.sourceFileId,
+          });
+        }
         const count = await tx.referralFile.count({
-          where: { referralId: id },
+          where: { referralId: id, removedAt: null },
         });
         if (count >= 60)
           throw new BadRequestException(
@@ -801,7 +831,13 @@ export class ReferralsService {
     if (record.revokedAt)
       throw new NotFoundException('Derivación no disponible.');
     const file = await this.prisma.referralFile.findFirst({
-      where: { id: fileId, referralId: id, kind: 'PHOTO', sourceFileId: null },
+      where: {
+        id: fileId,
+        referralId: id,
+        kind: 'PHOTO',
+        sourceFileId: null,
+        removedAt: null,
+      },
     });
     if (!file)
       throw new NotFoundException('Fotografía original no disponible.');
@@ -898,7 +934,7 @@ export class ReferralsService {
       if (!changed.count)
         throw new NotFoundException('Derivación no disponible.');
       const file = await tx.referralFile.updateMany({
-        where: { id: fileId, referralId: id, kind: 'PHOTO' },
+        where: { id: fileId, referralId: id, kind: 'PHOTO', removedAt: null },
         data: { photoView },
       });
       if (!file.count) throw new NotFoundException('Fotografía no disponible.');
@@ -913,7 +949,7 @@ export class ReferralsService {
   async download(id: string, fileId: string, actor: ReferralActor) {
     await this.access(id, actor);
     const file = await this.prisma.referralFile.findFirst({
-      where: { id: fileId, referralId: id },
+      where: { id: fileId, referralId: id, removedAt: null },
     });
     if (!file) throw new NotFoundException();
     await this.audit(this.prisma, actor, 'DOWNLOAD', id, { fileId });

@@ -33,6 +33,37 @@ type Pending = {
   uploading?: boolean;
 };
 
+function PhotoThumbnail({ url, name }: { url: string; name: string }) {
+  const container = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    });
+    if (container.current) observer.observe(container.current);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <span
+      ref={container}
+      className="flex h-full w-full items-center justify-center"
+    >
+      {visible ? (
+        <PrivatePhoto
+          url={url}
+          name={name}
+          className="h-full w-full object-contain"
+        />
+      ) : (
+        <span className="text-xs text-white/75">Vista previa</span>
+      )}
+    </span>
+  );
+}
+
 function PrivatePhoto({
   url,
   name,
@@ -221,7 +252,7 @@ export function PhotoWorkspace({
     <section className={panel}>
       <SectionHeading
         title="Fotografías"
-        description="Organiza las vistas clínicas en una galería. Los archivos originales se conservan."
+        description="Organiza las vistas clínicas. Al guardar un recorte revisado se retira su original."
         action={
           <Button className={primaryAction} onClick={() => setOpen(true)}>
             <Images size={18} />
@@ -476,12 +507,20 @@ export function PhotoWorkspace({
                   Las fotos aparecerán aquí después de subirlas.
                 </p>
               )}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {photos.map((photo) => (
                   <div
                     key={photo.id}
                     className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4"
                   >
+                    <button
+                      type="button"
+                      aria-label={`Ver fotografía ${photo.name}`}
+                      onClick={() => setSelected(photo)}
+                      className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[#1B1B1B] focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      <PhotoThumbnail url={fileUrl(photo)} name={photo.name} />
+                    </button>
                     <div className="flex items-start justify-between gap-3">
                       <p className="break-all text-sm font-medium">
                         {photo.name}
@@ -497,10 +536,12 @@ export function PhotoWorkspace({
                     </div>
                     <p className="text-xs font-semibold text-primary">
                       {photo.sourceFileId
-                        ? "Recorte revisado · original conservado"
+                        ? photo.sourceFile?.removedAt
+                          ? "Recorte revisado · original retirado"
+                          : "Recorte revisado · original conservado"
                         : "Fotografía original"}
                     </p>
-                    {photo.sourceFileId && (
+                    {photo.sourceFileId && !photo.sourceFile?.removedAt && (
                       <a
                         className="text-xs underline"
                         href={`${API_URL}/referrals/${record.id}/files/${photo.sourceFileId}`}

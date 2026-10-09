@@ -30,6 +30,7 @@ describe('Denticrop private crops', () => {
       },
       referralFile: {
         findFirst: jest.fn().mockResolvedValue({ id: 'original' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn().mockResolvedValue(1),
         create: jest.fn().mockResolvedValue({ id: 'crop' }),
       },
@@ -45,7 +46,7 @@ describe('Denticrop private crops', () => {
     fetchMock = jest.spyOn(globalThis, 'fetch');
   });
   afterEach(() => jest.restoreAllMocks());
-  it('saves a new private file linked to the scoped original, without overwriting it', async () => {
+  it('saves a crop and marks only its original for cleanup in the same transaction', async () => {
     await service.saveCrop(
       'case',
       'original',
@@ -60,6 +61,7 @@ describe('Denticrop private crops', () => {
         referralId: 'case',
         kind: 'PHOTO',
         sourceFileId: null,
+        removedAt: null,
       },
     });
     expect(db.referralFile.create.mock.calls[0][0].data).toMatchObject({
@@ -72,7 +74,48 @@ describe('Denticrop private crops', () => {
       referrerId: 'colleague',
       revokedAt: null,
     });
+    expect(db.referralFile.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'original',
+        referralId: 'case',
+        kind: 'PHOTO',
+        sourceFileId: null,
+        removedAt: null,
+      },
+      data: { removedAt: expect.any(Date) },
+    });
+    expect(storage.deleteObject).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('rejects a second replacement and cleans up only the uncommitted crop', async () => {
+    db.referralFile.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.saveCrop(
+        'case',
+        'original',
+        JSON.stringify(recipe),
+        'UNASSIGNED',
+        file,
+        actor,
+      ),
+    ).rejects.toThrow('reemplazado');
+    expect(db.referralFile.create).not.toHaveBeenCalled();
+    expect(storage.deleteObject).toHaveBeenCalledTimes(1);
+  });
+  it('keeps the original when the new image cannot be uploaded', async () => {
+    storage.putObject.mockRejectedValue(new Error('storage unavailable'));
+    await expect(
+      service.saveCrop(
+        'case',
+        'original',
+        JSON.stringify(recipe),
+        'UNASSIGNED',
+        file,
+        actor,
+      ),
+    ).rejects.toThrow();
+    expect(db.referralFile.updateMany).not.toHaveBeenCalled();
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
   it('rejects foreign files, non-photo originals and crops used as a source', async () => {
     db.referralFile.findFirst.mockResolvedValue(null);

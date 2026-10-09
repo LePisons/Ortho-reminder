@@ -62,6 +62,12 @@ La migración agrega tablas y campos; no elimina datos. El script `start:prod` e
 
 ## Verificación local
 
+### Miniaturas y retirada de originales (9 de octubre de 2026)
+
+Por solicitud del propietario, los nuevos recortes revisados reemplazan al original en el caso. Se almacena primero el recorte y se confirma en una sola transacción su registro y la retirada del original; un fallo revierte la retirada. La descarga y la clasificación excluyen archivos retirados. Un proceso cada 30 segundos borra el objeto original privado y reintenta ante errores o reinicios. Se conserva únicamente su registro de procedencia para el recorte, sin acceso al archivo. Los originales anteriores no se retiran retroactivamente. Las reglas anteriores que indicaban conservación permanente quedan sustituidas para nuevos guardados.
+
+La galería muestra miniaturas que se cargan al entrar en pantalla y permiten ampliar la imagen. Las pruebas cubren errores, reintentos, rechazo de reemplazos repetidos y acceso. La migración aditiva y la reversión real de una transacción fallida se comprobaron sobre una copia local restaurada, con archivos sintéticos y almacenamiento simulado.
+
 ### Denticrop integrado (9 de octubre de 2026)
 
 - Fotografías → Preparar fotografías permite seleccionar originales, proponer recortes por lote, revisar encuadre/rotación/espejo, elegir la vista y guardar solo los seleccionados y revisados. También permite recortar manualmente sin proveedor externo.

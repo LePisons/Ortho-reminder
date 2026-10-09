@@ -219,7 +219,7 @@ describe('External referral HTTP boundaries', () => {
       .get('/referrals/a/files/file-from-b')
       .expect(404);
     expect(prisma.referralFile.findFirst).toHaveBeenLastCalledWith({
-      where: { id: 'file-from-b', referralId: 'a' },
+      where: { id: 'file-from-b', referralId: 'a', removedAt: null },
     });
     expect(r2.getObject).not.toHaveBeenCalled();
   });

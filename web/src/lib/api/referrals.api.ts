@@ -194,7 +194,8 @@ export interface ReferralDetail extends ReferralInput {
     size: number;
     uploadedBy: string;
     sourceFileId?: string | null;
-    editRecipe?: import('@/lib/denticrop/types').ImageEdit | null;
+    sourceFile?: { removedAt: string | null } | null;
+    editRecipe?: import("@/lib/denticrop/types").ImageEdit | null;
     createdAt: string;
   }[];
   comments: {

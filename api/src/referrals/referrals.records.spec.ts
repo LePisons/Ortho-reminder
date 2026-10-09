@@ -93,7 +93,7 @@ describe('Treatment request and photo organization', () => {
     const { service, db, storage } = fixture();
     await service.classifyPhoto('case', 'photo', 'OCCLUSAL_LOWER', actor);
     expect(db.referralFile.updateMany).toHaveBeenCalledWith({
-      where: { id: 'photo', referralId: 'case', kind: 'PHOTO' },
+      where: { id: 'photo', referralId: 'case', kind: 'PHOTO', removedAt: null },
       data: { photoView: 'OCCLUSAL_LOWER' },
     });
     expect(storage.putObject).not.toHaveBeenCalled();

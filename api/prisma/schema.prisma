@@ -335,7 +335,7 @@ model Referral {
   @@index([patientId])
 }
 
-// Originals are immutable. Future automatic crops must be separate assets.
+// Crops are separate assets. Retired originals retain provenance metadata only.
 model ReferralFile {
   id String @id @default(cuid())
   referralId String
@@ -348,12 +348,15 @@ model ReferralFile {
   size Int
   uploadedBy String
   sourceFileId String?
+  removedAt DateTime?
+  storageDeletedAt DateTime?
   sourceFile ReferralFile? @relation("PhotoCrops", fields: [sourceFileId], references: [id], onDelete: Restrict)
   crops ReferralFile[] @relation("PhotoCrops")
   editRecipe Json?
   createdAt DateTime @default(now())
   @@index([referralId])
   @@index([sourceFileId])
+  @@index([removedAt, storageDeletedAt])
 }
 
 model ReferralNotificationEvent {
