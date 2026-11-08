@@ -11,7 +11,8 @@ export class ReferralOriginalCleanupService {
     private readonly r2: R2Service,
   ) {}
 
-  @Interval(30_000)
+  // Persisted cleanup can wait up to 15 minutes, avoiding constant idle DB traffic.
+  @Interval(900_000)
   async cleanup() {
     if (this.running) return;
     this.running = true;

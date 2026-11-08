@@ -15,7 +15,13 @@ describe('Referral activity notifications', () => {
     actions: ['UPLOAD', 'UPLOAD', 'COMMENT'],
     attempts: 0,
   };
+  const originalFlag = process.env.EMAIL_NOTIFICATIONS_ENABLED;
+  afterEach(() => {
+    if (originalFlag === undefined) delete process.env.EMAIL_NOTIFICATIONS_ENABLED;
+    else process.env.EMAIL_NOTIFICATIONS_ENABLED = originalFlag;
+  });
   beforeEach(() => {
+    process.env.EMAIL_NOTIFICATIONS_ENABLED = 'true';
     db = {
       $queryRaw: jest.fn().mockResolvedValue([{ locked: true }]),
       referralNotificationEvent: {
@@ -171,6 +177,13 @@ describe('Referral activity notifications', () => {
       'DOWNLOAD',
       'case',
     );
+    expect(db.referralNotificationEvent.create).not.toHaveBeenCalled();
+  });
+  it('keeps the audit but does not enqueue emails while disabled', async () => {
+    process.env.EMAIL_NOTIFICATIONS_ENABLED = 'false';
+    const referrals = new ReferralsService(db, {} as any);
+    await (referrals as any).audit(db, { userId: 'colleague', role: 'REFERRER' }, 'COMMENT', 'case');
+    expect(db.auditLog.create).toHaveBeenCalledTimes(1);
     expect(db.referralNotificationEvent.create).not.toHaveBeenCalled();
   });
   it('renders only static activity descriptions and escapes the link', () => {

@@ -1,5 +1,31 @@
 # Deploy OrthoReminder to Railway (solo, low-cost, secure)
 
+## Resource settings — November 2026
+
+- API Railway start command: `node dist/src/main`. Keep the existing pre-deploy
+  command `pnpm prisma migrate deploy`; do not run migrations twice or retain a
+  package-manager parent process for the lifetime of the application.
+- Web Railway start command: `node node_modules/next/dist/bin/next start`.
+  Set `NEXT_TELEMETRY_DISABLED=1` and enable Serverless on Web. Redeploy after
+  changing Serverless; the first request after sleep can have a cold start.
+- Keep API and Postgres awake: the API owns daily clinical scheduling jobs.
+- `EMAIL_NOTIFICATIONS_ENABLED=false` (also the default when unset) suppresses
+  all notification emails and new referral notification queue entries, while
+  retaining audit records, aligner progression and automatic appointments.
+  Set it to `true` to resume emails; existing pending referral deliveries are
+  retained and may then be sent. Review pending deliveries before re-enabling.
+- Photo originals cleanup runs every 15 minutes instead of every 30 seconds;
+  original cleanup remains conditional on committed crops. Photos are retained
+  in private Cloudflare R2; manual editing/rendering runs in the browser.
+- Referral email polling, when enabled and configured, runs every 5 minutes.
+  Todoist polling runs every 30 minutes, skips unconfigured integrations, and
+  loads matching appointments in one query rather than one query per task.
+- These changes reduce idle usage; they do not impose a spending cap. Compare
+  Railway resource metrics and billing after a full day of normal use. Avoid a
+  hard spending limit unless downtime on reaching that limit is acceptable.
+
+The historical setup notes below predate these resource settings.
+
 ## Context
 
 You want to deploy OrthoReminder so you can use it from your phone, with auto-deploys,

@@ -3,6 +3,12 @@ import { referralChecklist } from './referral-checklist';
 import { ForbiddenException } from '@nestjs/common';
 
 describe('Setup approval and case progress', () => {
+  const originalFlag = process.env.EMAIL_NOTIFICATIONS_ENABLED;
+  beforeEach(() => { process.env.EMAIL_NOTIFICATIONS_ENABLED = 'true'; });
+  afterEach(() => {
+    if (originalFlag === undefined) delete process.env.EMAIL_NOTIFICATIONS_ENABLED;
+    else process.env.EMAIL_NOTIFICATIONS_ENABLED = originalFlag;
+  });
   let db: any, service: ReferralsService;
   const admin = { userId: 'owner', role: 'ADMIN' },
     colleague = { userId: 'colleague', role: 'REFERRER' };

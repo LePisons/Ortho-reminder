@@ -56,7 +56,7 @@ export class ReferralNotificationsService {
     }
   }
 
-  @Interval(30_000)
+  @Interval(300_000)
   async dispatch() {
     if (this.running) return;
     const origin = this.origin();

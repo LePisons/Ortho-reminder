@@ -28,6 +28,9 @@ export class NotificationDispatcherService {
   ) {}
 
   async dispatch(job: NotificationJob): Promise<void> {
+    // Skip before rendering or writing logs; do not record suppressed emails as sent.
+    if (job.channel === MessageChannel.EMAIL && !this.emailProvider.isAvailable()) return;
+
     const provider =
       job.channel === MessageChannel.EMAIL
         ? this.emailProvider

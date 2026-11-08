@@ -30,8 +30,9 @@ export class TodoistService implements OnModuleInit {
       }
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_30_MINUTES)
   async handleCron() {
+    if (!this.api) return;
     this.logger.debug('Syncing with Todoist...', TodoistService.name); // Corrected logger usage
     await this.sync();
   }
@@ -109,10 +110,14 @@ export class TodoistService implements OnModuleInit {
           const response = await this.api.getTasks(filter);
           const tasks = response.results || response;
           
+          if (!tasks.length) return;
+          const appointments = await this.prisma.appointment.findMany({
+              where: { todoistTaskId: { in: tasks.map((task) => task.id) } },
+              select: { id: true, todoistTaskId: true, start: true, end: true },
+          });
+          const byTask = new Map(appointments.map((appointment) => [appointment.todoistTaskId, appointment]));
           for (const task of tasks) {
-              const localAppt = await this.prisma.appointment.findUnique({
-                  where: { todoistTaskId: task.id },
-              });
+              const localAppt = byTask.get(task.id);
 
               if (localAppt) {
                   // Check if date changed

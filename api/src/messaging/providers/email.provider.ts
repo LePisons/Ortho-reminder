@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import { emailNotificationsEnabled } from '../../config/notification-policy';
 import {
   IMessagingProvider,
   MessageResult,
@@ -21,7 +22,8 @@ export class EmailProvider implements IMessagingProvider {
   }
 
   isAvailable(): boolean {
-    return !!this.configService.get<string>('RESEND_API_KEY');
+    return emailNotificationsEnabled(this.configService.get<string>('EMAIL_NOTIFICATIONS_ENABLED'))
+      && !!this.configService.get<string>('RESEND_API_KEY');
   }
 
   async send(
@@ -30,6 +32,9 @@ export class EmailProvider implements IMessagingProvider {
     subject?: string,
     idempotencyKey?: string,
   ): Promise<MessageResult> {
+    if (!this.isAvailable()) {
+      return { success: false, error: 'Email notifications disabled or provider unavailable' };
+    }
     try {
       const result = await this.resend.emails.send(
         {

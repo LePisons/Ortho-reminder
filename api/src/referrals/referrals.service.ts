@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, ReferralStatus } from '@prisma/client';
 import { randomBytes, randomUUID } from 'crypto';
+import { emailNotificationsEnabled } from '../config/notification-policy';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { R2Service } from '../storage/r2.service';
@@ -102,6 +103,7 @@ export class ReferralsService {
       },
     });
     if (
+      emailNotificationsEnabled() &&
       actor.role === 'REFERRER' &&
       [
         'CREATE',
